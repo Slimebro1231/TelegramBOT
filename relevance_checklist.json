@@ -1,0 +1,101 @@
+{
+  "relevance_checklist": {
+    "description": "AI checklist to verify news relevance before posting",
+    "scoring": {
+      "high_relevance": "8-10",
+      "medium_relevance": "5-7",
+      "low_relevance": "1-4",
+      "not_relevant": 0
+    },
+    "categories": {
+      "rwa_tokenization": {
+        "keywords": [
+          "tokenization", "real world assets", "rwa", "asset backed tokens",
+          "security tokens", "sto", "digital assets", "blockchain assets",
+          "tokenized real estate", "tokenized commodities", "fractionalized ownership",
+          "asset digitization", "traditional asset tokenization"
+        ],
+        "institutions": [
+          "blackrock", "fidelity", "jpmorgan", "goldman sachs", "morgan stanley",
+          "ubs", "deutsche bank", "credit suisse", "wells fargo", "citigroup"
+        ],
+        "relevance_indicators": [
+          "institutional adoption of tokenization",
+          "regulatory approval for token offerings",
+          "major platform launches for asset tokenization",
+          "traditional finance embracing digital assets",
+          "new tokenization frameworks or standards",
+          "partnerships between tradfi and crypto"
+        ]
+      },
+      "gold_markets": {
+        "keywords": [
+          "gold", "precious metals", "bullion", "gold etf", "gold mining",
+          "gold reserves", "central bank gold", "gold futures", "spot gold",
+          "gold backed", "xau", "troy ounce", "gold price", "gold demand"
+        ],
+        "institutions": [
+          "federal reserve", "ecb", "bank of england", "pboc", "rbi",
+          "central banks", "imf", "world bank", "spdr gold", "ishares gold"
+        ],
+        "relevance_indicators": [
+          "central bank gold purchases or sales",
+          "gold price movements above 2% in a day",
+          "new gold-backed financial products",
+          "major mining discoveries or closures",
+          "gold policy changes by governments",
+          "institutional gold investment flows"
+        ]
+      },
+      "partnerships_deals": {
+        "keywords": [
+          "partnership", "collaboration", "merger", "acquisition", "joint venture",
+          "strategic alliance", "investment", "deal", "agreement", "integration",
+          "cooperation", "working together", "teams up with", "announces partnership"
+        ],
+        "sectors": [
+          "fintech", "blockchain", "cryptocurrency", "digital payments",
+          "asset management", "trading platforms", "custody solutions",
+          "regulatory technology", "compliance", "infrastructure"
+        ],
+        "relevance_indicators": [
+          "major tech companies entering crypto/rwa space",
+          "traditional banks partnering with crypto firms",
+          "cross-border payment partnerships",
+          "infrastructure partnerships for digital assets",
+          "regulatory compliance partnerships",
+          "custody or trading platform integrations"
+        ]
+      },
+      "regulatory_developments": {
+        "keywords": [
+          "regulation", "sec", "cftc", "fca", "mica", "compliance", "legal framework",
+          "approval", "license", "guidance", "policy", "law", "government",
+          "regulatory clarity", "institutional framework"
+        ],
+        "relevance_indicators": [
+          "new regulatory frameworks for digital assets",
+          "institutional crypto/rwa product approvals",
+          "major regulatory enforcement actions",
+          "policy changes affecting institutional adoption",
+          "international regulatory coordination",
+          "compliance requirement updates"
+        ]
+      }
+    },
+    "exclusion_criteria": {
+      "not_relevant": [
+        ""
+      ],
+      "low_priority": [
+        "minor price movements without fundamental drivers",
+        "routine corporate earnings without strategic significance",
+        "general industry commentary without specific developments",
+        "conference announcements without major reveals",
+        "minor personnel changes",
+        "routine compliance updates"
+      ]
+    },
+    "evaluation_prompt": "Rate this article's relevance (0-10) based on: 1) Does it involve institutional adoption of RWA/crypto/gold? 2) Are there specific partnerships, deals, or regulatory developments? 3) Will this impact traditional finance or institutional investors? 4) Is this breaking news with market implications? 5) Does it advance the tokenization or digitization of real-world assets?"
+  }
+} 
