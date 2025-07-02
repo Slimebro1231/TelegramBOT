@@ -33,6 +33,7 @@ import time
 import random
 from news_scraper import get_single_relevant_article, format_article_for_ai, NewsArticle, get_tracker_stats, NewsScraper
 from conflict_resolution import nuclear_conflict_resolution, ultra_robust_polling_start, should_use_conflict_resolution, should_use_ultra_robust_polling
+from bitdeer_ai_client import BitdeerAIClient
 
 # --- Config ------------------------------------------------------------------
 load_dotenv()  # take environment variables from .env, if present
@@ -44,6 +45,20 @@ MODEL_NAME = "r1-assistant"  # Name we'll give our model in Ollama
 MAX_MESSAGE_LENGTH = 4000  # Telegram limit is 4096, leave some buffer
 CHANNEL_ID = "@Matrixdock_News"  # Channel to post automatic news
 NEWS_INTERVAL = 1800  # 30 minutes between posts (in seconds)
+
+# --- AI Configuration --------------------------------------------------------
+# Environment detection for cloud vs local deployment
+IS_CLOUD = os.getenv("DEPLOYMENT_ENV") == "cloud"
+
+if IS_CLOUD:
+    # Bitdeer Cloud AI Configuration
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API")
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("❌ Missing DEEPSEEK_API environment variable in cloud environment")
+    print(f"✅ Cloud mode: Using Bitdeer DeepSeek-R1 API")
+else:
+    # Local Ollama Configuration
+    print(f"🔧 Local mode: Using Ollama with {MODEL_NAME}")
 
 # --- Status Tracking ---------------------------------------------------------
 class BotStatus:
@@ -81,42 +96,52 @@ signal.signal(signal.SIGTERM, cleanup_and_exit)
 
 # --- AI Helper Functions -----------------------------------------------------
 async def get_ai_response(prompt: str, context: str = "", command: str = "chat") -> str:
-    """Get response from local r1 model via Ollama."""
+    """Get response from AI model - Bitdeer cloud or local Ollama."""
     try:
         full_prompt = f"{context}\n\n{prompt}" if context else prompt
         
-        print(f"🧠 [{command.upper()}] AI Thinking Process:")
+        print(f"🧠 [{command.upper()}] AI Processing...")
         print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
         
-        # Run ollama.chat in a thread to avoid blocking the async event loop
-        loop = asyncio.get_event_loop()
-        
-        print("⚡ Sending request to AI model...")
-        response = await loop.run_in_executor(
-            None, 
-            lambda: ollama.chat(
-                model=MODEL_NAME,
-                messages=[{'role': 'user', 'content': full_prompt}]
+        if IS_CLOUD:
+            # Use Bitdeer AI API
+            print("⚡ Sending request to Bitdeer DeepSeek-R1...")
+            
+            async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
+                ai_response = await client.simple_chat(full_prompt, context)
+            
+            print(f"✅ Bitdeer API response: {len(ai_response)} chars")
+            
+        else:
+            # Use local Ollama
+            print("⚡ Sending request to local Ollama...")
+            loop = asyncio.get_event_loop()
+            
+            response = await loop.run_in_executor(
+                None, 
+                lambda: ollama.chat(
+                    model=MODEL_NAME,
+                    messages=[{'role': 'user', 'content': full_prompt}]
+                )
             )
-        )
+            
+            ai_response = response['message']['content']
+            print(f"✅ Ollama response: {len(ai_response)} chars")
         
-        ai_response = response['message']['content']
-        
-        # Log thinking process to console ONLY - never send to user
-        print(f"🔍 Raw AI Response Length: {len(ai_response)} chars")
+        # Log thinking process to console (for debugging)
         if len(ai_response) > 200:
-            print(f"💭 AI Thinking Preview: {ai_response[:200]}...")
+            print(f"💭 AI Response Preview: {ai_response[:200]}...")
         else:
             print(f"💭 AI Full Response: {ai_response}")
         
         bot_status.log_ai_response()
         
-        # Extract content after thinking process - R1 models may use <think> tags or direct thinking
+        # Extract content after thinking process - works for both R1 models
         def extract_final_response(response_text):
             """Extract the final response after thinking process."""
             import re
             
-            # First, try to remove <think>...</think> blocks
+            # First, try to remove <think>...</think> blocks (common in R1 models)
             think_pattern = r'<think>.*?</think>'
             cleaned = re.sub(think_pattern, '', response_text, flags=re.DOTALL | re.IGNORECASE)
             
