@@ -100,21 +100,27 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
     try:
         full_prompt = f"{context}\n\n{prompt}" if context else prompt
         
-        print(f"🧠 [{command.upper()}] AI Processing...")
-        print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+        # Debug logging - only in development mode
+        debug_mode = os.getenv("DEBUG_MODE") == "true"
+        if debug_mode:
+            print(f"🧠 [{command.upper()}] AI Processing...")
+            print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
         
         if IS_CLOUD:
             # Use Bitdeer AI API
-            print("⚡ Sending request to Bitdeer DeepSeek-R1...")
+            if debug_mode:
+                print("⚡ Sending request to Bitdeer DeepSeek-R1...")
             
             async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
                 ai_response = await client.simple_chat(full_prompt, context)
             
-            print(f"✅ Bitdeer API response: {len(ai_response)} chars")
+            if debug_mode:
+                print(f"✅ Bitdeer API response: {len(ai_response)} chars")
             
         else:
             # Use local Ollama
-            print("⚡ Sending request to local Ollama...")
+            if debug_mode:
+                print("⚡ Sending request to local Ollama...")
             loop = asyncio.get_event_loop()
             
             response = await loop.run_in_executor(
@@ -126,13 +132,15 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
             )
             
             ai_response = response['message']['content']
-            print(f"✅ Ollama response: {len(ai_response)} chars")
+            if debug_mode:
+                print(f"✅ Ollama response: {len(ai_response)} chars")
         
         # Log thinking process to console (for debugging)
-        if len(ai_response) > 200:
-            print(f"💭 AI Response Preview: {ai_response[:200]}...")
-        else:
-            print(f"💭 AI Full Response: {ai_response}")
+        if debug_mode:
+            if len(ai_response) > 200:
+                print(f"💭 AI Response Preview: {ai_response[:200]}...")
+            else:
+                print(f"💭 AI Full Response: {ai_response}")
         
         bot_status.log_ai_response()
         
@@ -178,22 +186,27 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
             
             return '\n'.join(final_lines).strip()
         
-        ai_response = extract_final_response(ai_response)
+        # Extract final response only for local Ollama (cloud responses are already clean)
+        if not IS_CLOUD:
+            ai_response = extract_final_response(ai_response)
         
         # Truncate if too long
         if len(ai_response) > MAX_MESSAGE_LENGTH:
             original_length = len(ai_response)
             ai_response = ai_response[:MAX_MESSAGE_LENGTH-50] + "...\n\n[Response truncated]"
-            print(f"✂️ Truncated response: {original_length} → {len(ai_response)} chars")
+            if debug_mode:
+                print(f"✂️ Truncated response: {original_length} → {len(ai_response)} chars")
             
-        print(f"✅ Clean response ready ({len(ai_response)} chars)")
+        if debug_mode:
+            print(f"✅ Clean response ready ({len(ai_response)} chars)")
         return ai_response
         
     except Exception as e:
         bot_status.log_error()
         error_msg = str(e)
-        print(f"❌ AI Error Details: {error_msg}")
-        print(f"🔧 Falling back to curated content for {command}")
+        if debug_mode:
+            print(f"❌ AI Error Details: {error_msg}")
+            print(f"🔧 Falling back to curated content for {command}")
         return None
 
 def log_command(command: str, user_id: int, username: str = None):
@@ -205,11 +218,12 @@ def log_command(command: str, user_id: int, username: str = None):
 
 def log_thinking_step(step: str, details: str = ""):
     """Log AI thinking steps to console."""
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    if details:
-        print(f"🧩 [{timestamp}] {step}: {details}")
-    else:
-        print(f"🧩 [{timestamp}] {step}")
+    if os.getenv("DEBUG_MODE") == "true":
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if details:
+            print(f"🧩 [{timestamp}] {step}: {details}")
+        else:
+            print(f"🧩 [{timestamp}] {step}")
 
 def convert_to_est(dt):
     """Convert datetime to EST timezone."""
@@ -742,12 +756,14 @@ async def gold_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Get recent news context
     recent_news = get_recent_news_summary(24)
     
-    gold_prompt = f"""Based on recent news developments, provide a concise gold market analysis with 3-4 key points about current trends, institutional activity, and what investors should watch. Format with bullet points.
+    gold_prompt = f"""Provide exactly 3 bullet points about current gold market trends. Each point should be 1-2 sentences max. Start each with • symbol.
 
-Recent News Context:
-{recent_news}
+Topics to cover:
+• Central bank policies and interest rates
+• Geopolitical tensions and safe-haven demand  
+• Economic outlook and inflation trends
 
-Focus on gold-related developments, central bank activity, institutional demand, and market implications from these recent events."""
+Format: • [Brief trend description]"""
     
     # Get AI market analysis
     ai_response = await get_ai_response(gold_prompt, command="gold")
@@ -772,12 +788,14 @@ async def rwa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Get recent news context
     recent_news = get_recent_news_summary(24)
     
-    rwa_prompt = f"""Based on recent news developments, provide a concise RWA (Real World Assets) tokenization market analysis with 3-4 key points about current trends, institutional adoption, and what investors should watch. Format with bullet points.
+    rwa_prompt = f"""Provide exactly 3 bullet points about RWA tokenization opportunities. Each point should be 1-2 sentences max. Start each with • symbol.
 
-Recent News Context:
-{recent_news}
+Topics to cover:
+• Liquidity and fractional ownership benefits
+• Institutional adoption and regulatory progress
+• New asset classes and market expansion
 
-Focus on RWA tokenization developments, institutional adoption, regulatory progress, and market implications from these recent events."""
+Format: • [Brief opportunity description]"""
     
     ai_response = await get_ai_response(rwa_prompt, command="rwa")
     
@@ -900,7 +918,7 @@ async def bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     log_thinking_step("BD Analysis", "Requesting Matrixdock-focused partnership analysis")
     
     ai_response = await get_ai_response(
-        "Provide a concise analysis of partnership opportunities for Matrixdock in the RWA/gold tokenization space with 3-4 key points about strategic angles, potential collaborators, and business development priorities. Focus on institutional partnerships, technology integrations, and market expansion opportunities. Format with bullet points.",
+        "Provide exactly 3 bullet points about crypto exchange partnership opportunities. Each point should be 1-2 sentences max. Start each with • symbol.\n\nTopics: liquidity partnerships, market expansion, institutional services\n\nFormat: • [Brief opportunity description]",
         command="bd"
     )
     

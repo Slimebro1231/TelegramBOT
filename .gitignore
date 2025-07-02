@@ -4,6 +4,7 @@
 .env.development
 .env.test
 .env.production
+.env.cloud
 *.key
 *.pem
 config.ini
