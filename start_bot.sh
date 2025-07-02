@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "🚀 Starting Telegram Bot with Enhanced Conflict Resolution"
+echo "⚡ Command-Only Mode: Bot responds only to /commands"
 echo "============================================================"
 
 # Function to kill all bot processes aggressively

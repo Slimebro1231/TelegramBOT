@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Telegram Bot - Cloud Mode (Bitdeer API)
+# Telegram Bot - API-Only Mode (Bitdeer DeepSeek-R1)
 # Run this script to start your bot with Bitdeer DeepSeek-R1 API
 
-echo "🚀 Starting Telegram Bot in Cloud Mode..."
-echo "✅ Using Bitdeer DeepSeek-R1 API"n
+echo "🚀 Starting Telegram Bot in API-Only Mode..."
+echo "✅ Using Bitdeer DeepSeek-R1 API (no local dependencies)"
 
 # Check if API key is set
 if [ -z "$DEEPSEEK_API" ]; then
@@ -20,14 +20,12 @@ if [ -z "$BOT_TOKEN" ]; then
     exit 1
 fi
 
-# Set cloud environment
-export DEPLOYMENT_ENV=cloud
-
 echo "🔑 API Key: ${DEEPSEEK_API:0:10}...${DEEPSEEK_API: -4}"
 echo "🤖 Bot Token: ${BOT_TOKEN:0:10}...${BOT_TOKEN: -4}"
-echo "🌐 Environment: $DEPLOYMENT_ENV"
+echo "🌐 Mode: API-Only (no local AI model required)"
 echo ""
 echo "💡 Available commands: /gold, /rwa, /bd, /meaning, /summary, /status"
+echo "⚡ Command-only mode: Bot ignores non-command messages"
 echo "📺 Channel: @Matrixdock_News (news posts every 30 minutes)"
 echo ""
 echo "🎯 Starting bot... (Press Ctrl+C to stop)"

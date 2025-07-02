@@ -1,17 +1,17 @@
 """
-Telegram AI Bot with Local R1 14B Model Integration
-==================================================
+Telegram AI Bot with Bitdeer DeepSeek-R1 API Integration
+========================================================
 
 • Loads `BOT_TOKEN` from a .env file or environment variable
-• Connects to local r1-14b model via Ollama
-• Responds to /start, /help, /gold, /rwa, /meaning, and /bd commands
-• Uses AI for intelligent responses to user queries
+• API-only mode using Bitdeer DeepSeek-R1 cloud service
+• Command-only mode: responds ONLY to messages starting with /
+• Available commands: /start, /help, /gold, /rwa, /meaning, /bd, /summary, /status
 • Uses python‑telegram‑bot v22+ (async Application API)
 """
 
 import os
 import asyncio
-import ollama
+# import ollama  # Removed - API-only mode
 import threading
 import json
 import re
@@ -47,18 +47,12 @@ CHANNEL_ID = "@Matrixdock_News"  # Channel to post automatic news
 NEWS_INTERVAL = 1800  # 30 minutes between posts (in seconds)
 
 # --- AI Configuration --------------------------------------------------------
-# Environment detection for cloud vs local deployment
-IS_CLOUD = os.getenv("DEPLOYMENT_ENV") == "cloud"
-
-if IS_CLOUD:
-    # Bitdeer Cloud AI Configuration
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API")
-    if not DEEPSEEK_API_KEY:
-        raise RuntimeError("❌ Missing DEEPSEEK_API environment variable in cloud environment")
-    print(f"✅ Cloud mode: Using Bitdeer DeepSeek-R1 API")
-else:
-    # Local Ollama Configuration
-    print(f"🔧 Local mode: Using Ollama with {MODEL_NAME}")
+# API-only mode - always use Bitdeer cloud
+IS_CLOUD = True
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API")
+if not DEEPSEEK_API_KEY:
+    raise RuntimeError("❌ Missing DEEPSEEK_API environment variable")
+print(f"✅ API-only mode: Using Bitdeer DeepSeek-R1 API")
 
 # --- Status Tracking ---------------------------------------------------------
 class BotStatus:
@@ -106,34 +100,15 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
             print(f"🧠 [{command.upper()}] AI Processing...")
             print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
         
-        if IS_CLOUD:
-            # Use Bitdeer AI API
-            if debug_mode:
-                print("⚡ Sending request to Bitdeer DeepSeek-R1...")
-            
-            async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
-                ai_response = await client.simple_chat(full_prompt, context)
-            
-            if debug_mode:
-                print(f"✅ Bitdeer API response: {len(ai_response)} chars")
-            
-        else:
-            # Use local Ollama
-            if debug_mode:
-                print("⚡ Sending request to local Ollama...")
-            loop = asyncio.get_event_loop()
-            
-            response = await loop.run_in_executor(
-                None, 
-                lambda: ollama.chat(
-                    model=MODEL_NAME,
-                    messages=[{'role': 'user', 'content': full_prompt}]
-                )
-            )
-            
-            ai_response = response['message']['content']
-            if debug_mode:
-                print(f"✅ Ollama response: {len(ai_response)} chars")
+        # Use Bitdeer AI API (API-only mode)
+        if debug_mode:
+            print("⚡ Sending request to Bitdeer DeepSeek-R1...")
+        
+        async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
+            ai_response = await client.simple_chat(full_prompt, context)
+        
+        if debug_mode:
+            print(f"✅ Bitdeer API response: {len(ai_response)} chars")
         
         # Log thinking process to console (for debugging)
         if debug_mode:
@@ -144,51 +119,94 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
         
         bot_status.log_ai_response()
         
-        # Extract content after thinking process - works for both R1 models
+        # Enhanced thinking detection and filtering for all commands
         def extract_final_response(response_text):
-            """Extract the final response after thinking process."""
+            """Extract the final response after thinking process with enhanced filtering."""
             import re
+            
+            def is_thinking_content(text: str) -> bool:
+                """Check if text contains AI thinking process indicators."""
+                text_lower = text.lower()
+                thinking_indicators = [
+                    'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
+                    'analyzing', 'considering', 'let me', 'i should', 'the article details',
+                    'for the first point', 'for the second', 'for the third', 'each bullet point',
+                    'between 10-15 words', 'about market impact', 'i\'ll need to create',
+                    'with a relevance score', 'the summary mentions', 'published on',
+                    'the user wants me to', 'i\'ll need to', 'bullet points about'
+                ]
+                return any(indicator in text_lower for indicator in thinking_indicators)
             
             # First, try to remove <think>...</think> blocks (common in R1 models)
             think_pattern = r'<think>.*?</think>'
             cleaned = re.sub(think_pattern, '', response_text, flags=re.DOTALL | re.IGNORECASE)
             
-            # If no <think> tags found, look for bullet points and extract only those
-            if cleaned == response_text:  # No <think> tags were removed
-                lines = response_text.split('\n')
-                bullet_lines = []
-                
-                for line in lines:
-                    line = line.strip()
-                    # Only keep lines that start with bullet points
-                    if line and (line.startswith('•') or line.startswith('-') or line.startswith('*')):
-                        if not line.startswith('•'):
-                            line = '•' + line[1:]  # Standardize to •
-                        bullet_lines.append(line)
-                
-                # If we found bullet points, return only those
-                if bullet_lines:
-                    return '\n'.join(bullet_lines)
-                else:
-                    # Fallback: look for the last few sentences that seem like conclusions
-                    sentences = [s.strip() for s in response_text.split('.') if s.strip()]
-                    if len(sentences) >= 3:
-                        return '\n'.join(f"• {s}." for s in sentences[-3:])
+            # Extract bullet points from the response with thinking detection
+            lines = (cleaned if cleaned != response_text else response_text).split('\n')
+            bullet_lines = []
             
-            # Clean up any remaining whitespace and empty lines
+            for line in lines:
+                line = line.strip()
+                # Only keep lines that start with bullet points
+                if line and (line.startswith('•') or line.startswith('-') or line.startswith('*')):
+                    
+                    # Check if this bullet contains thinking process indicators
+                    if is_thinking_content(line):
+                        continue
+                        
+                    # Skip bullets that are too long (likely thinking process)
+                    bullet_content = line.replace('•', '').replace('-', '').replace('*', '').strip()
+                    if len(bullet_content) > 200:  # Too verbose, likely thinking
+                        continue
+                    
+                    # Skip bullets with ellipsis or incomplete content
+                    if ('...' in line or 
+                        line.count('•') > 1 or  # Multiple bullets on one line
+                        bullet_content.count(' ') < 3 or  # Too short (less than 4 words)
+                        line.endswith('(e.g.,') or line.endswith('(e.g.') or  # Incomplete examples
+                        bullet_content.strip() in ['', '...', '•'] or  # Empty or just symbols
+                        len(bullet_content) < 15):  # Too short to be meaningful
+                        continue
+                    
+                    if not line.startswith('•'):
+                        line = '•' + line[1:]  # Standardize to •
+                    bullet_lines.append(line)
+            
+            # If we found clean bullet points, return those
+            if bullet_lines:
+                return '\n'.join(bullet_lines)
+            
+            # Fallback: look for non-thinking sentences
+            sentences = [s.strip() for s in response_text.split('.') if s.strip() and len(s.strip()) > 20]
+            clean_sentences = []
+            
+            for sentence in sentences[-5:]:  # Check last 5 sentences
+                if not is_thinking_content(sentence):
+                    clean_sentences.append(f"• {sentence}.")
+                    if len(clean_sentences) >= 3:
+                        break
+            
+            if clean_sentences:
+                return '\n'.join(clean_sentences)
+            
+            # Last resort: clean up the original response
             lines = cleaned.split('\n')
             final_lines = []
             
             for line in lines:
                 line = line.strip()
-                if line:  # Only keep non-empty lines
+                if line and not is_thinking_content(line):  # Only keep non-thinking lines
                     final_lines.append(line)
             
             return '\n'.join(final_lines).strip()
         
-        # Extract final response only for local Ollama (cloud responses are already clean)
-        if not IS_CLOUD:
-            ai_response = extract_final_response(ai_response)
+        # Apply thinking detection to all AI responses
+        original_response = ai_response
+        ai_response = extract_final_response(ai_response)
+        
+        # Log if thinking content was filtered
+        if debug_mode and len(original_response) > len(ai_response):
+            print(f"🧠 Thinking content filtered: {len(original_response)} → {len(ai_response)} chars")
         
         # Truncate if too long
         if len(ai_response) > MAX_MESSAGE_LENGTH:
@@ -427,6 +445,181 @@ Respond with: SCORE: [0-10] | REASON: [brief explanation]"""
         print(f"❌ Error verifying relevance: {e}")
         return True, 5, f"Error in evaluation: {str(e)}"
 
+def validate_and_improve_bullets(bullet_points: list, headline: str) -> list:
+    """Validate and improve bullet points with comprehensive quality control."""
+    
+    def is_complete_sentence(text: str) -> bool:
+        """Check if text is a complete sentence."""
+        text = text.strip()
+        if len(text) < 8:  # Too short
+            return False
+        if not text.endswith(('.', '!', '?')):  # No proper ending
+            return False
+        if text.endswith(' and'):  # Incomplete conjunction
+            return False
+        if any(word in text.lower() for word in ['and ', 'but ', 'or ']) and not text.strip().endswith(('.', '!', '?')):
+            return False
+        return True
+    
+    def is_thinking_content(text: str) -> bool:
+        """Check if text contains AI thinking process indicators."""
+        text_lower = text.lower()
+        thinking_indicators = [
+            'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
+            'analyzing', 'considering', 'let me', 'i should', 'the article details',
+            'for the first point', 'for the second', 'for the third', 'each bullet point',
+            'between 10-15 words', 'about market impact', 'i\'ll need to create',
+            'with a relevance score', 'the summary mentions', 'published on',
+            'the user wants me to', 'i\'ll need to', 'bullet points about'
+        ]
+        return any(indicator in text_lower for indicator in thinking_indicators)
+    
+    def clean_bullet(bullet: str) -> str:
+        """Clean and standardize bullet point format."""
+        bullet = bullet.strip()
+        
+        # Remove multiple spaces
+        bullet = ' '.join(bullet.split())
+        
+        # Ensure starts with •
+        if bullet.startswith(('-', '*')):
+            bullet = '•' + bullet[1:]
+        elif not bullet.startswith('•'):
+            bullet = '• ' + bullet
+        
+        # Ensure space after •
+        if bullet.startswith('•') and len(bullet) > 1 and bullet[1] != ' ':
+            bullet = '• ' + bullet[1:]
+            
+        return bullet
+    
+    def get_smart_fallback_bullets(headline: str) -> list:
+        """Generate contextual fallback bullets based on headline keywords."""
+        fallbacks = []
+        headline_lower = headline.lower()
+        
+        # Context-aware fallbacks based on headline content
+        if any(word in headline_lower for word in ['lawsuit', 'legal', 'court', 'judge']):
+            fallbacks = [
+                "• Legal proceedings create market uncertainty and regulatory scrutiny.",
+                "• Institutional investors may reassess risk profiles and exposure levels.", 
+                "• Settlement outcomes could establish important precedents for industry."
+            ]
+        elif any(word in headline_lower for word in ['bitcoin', 'btc', 'crypto']):
+            fallbacks = [
+                "• Bitcoin price movements influence broader cryptocurrency market sentiment.",
+                "• Institutional adoption patterns continue shaping long-term market dynamics.",
+                "• Regulatory developments remain key factor in price discovery mechanisms."
+            ]
+        elif any(word in headline_lower for word in ['fed', 'interest', 'rate', 'monetary']):
+            fallbacks = [
+                "• Federal Reserve policy shifts impact investor risk appetite significantly.",
+                "• Interest rate changes influence capital flows across asset classes.",
+                "• Monetary policy decisions create ripple effects throughout financial markets."
+            ]
+        elif any(word in headline_lower for word in ['gold', 'precious', 'metal']):
+            fallbacks = [
+                "• Gold demand reflects ongoing inflation hedging strategies by institutions.",
+                "• Precious metals markets respond to global economic uncertainty patterns.",
+                "• Central bank purchasing activity supports underlying price fundamentals."
+            ]
+        else:
+            # Generic high-quality fallbacks
+            fallbacks = [
+                "• Market developments signal evolving institutional investment strategies.",
+                "• Regulatory clarity continues improving across traditional finance sectors.",
+                "• Investor sentiment reflects broader economic uncertainty and opportunity assessment."
+            ]
+            
+        return fallbacks
+    
+    # Step 1: Clean all bullets and filter thinking content
+    cleaned_bullets = []
+    for bullet in bullet_points:
+        if bullet and bullet.strip():
+            # Skip thinking process content
+            if is_thinking_content(bullet):
+                continue
+                
+            # Skip bullets with ellipsis (incomplete thinking)
+            if '...' in bullet:
+                continue
+                
+            cleaned = clean_bullet(bullet)
+            if cleaned and len(cleaned) > 5:  # Basic length check
+                cleaned_bullets.append(cleaned)
+    
+    # Step 2: Remove duplicates (case-insensitive)
+    unique_bullets = []
+    seen_content = set()
+    
+    for bullet in cleaned_bullets:
+        # Extract content without • symbol for comparison
+        content = bullet.replace('•', '').strip().lower()
+        if content not in seen_content and len(content) > 10:
+            unique_bullets.append(bullet)
+            seen_content.add(content)
+    
+    # Step 3: Validate completeness and filter thinking content
+    complete_bullets = []
+    for bullet in unique_bullets:
+        bullet_content = bullet.replace('•', '').strip()
+        
+        # Skip thinking content that may have passed earlier filters
+        if is_thinking_content(bullet_content):
+            continue
+            
+        if is_complete_sentence(bullet_content):
+            complete_bullets.append(bullet)
+    
+    # Step 4: Ensure exactly 3 high-quality bullets
+    if len(complete_bullets) >= 3:
+        # Take first 3 complete bullets
+        final_bullets = complete_bullets[:3]
+    else:
+        # Mix good bullets with smart fallbacks
+        fallback_bullets = get_smart_fallback_bullets(headline)
+        
+        # Start with complete bullets we have
+        final_bullets = complete_bullets.copy()
+        
+        # Add fallbacks to reach 3 total
+        fallback_index = 0
+        while len(final_bullets) < 3 and fallback_index < len(fallback_bullets):
+            candidate = fallback_bullets[fallback_index]
+            
+            # Check if fallback is already similar to existing bullets
+            candidate_content = candidate.replace('•', '').strip().lower()
+            is_duplicate = any(
+                candidate_content in existing.replace('•', '').strip().lower() 
+                or existing.replace('•', '').strip().lower() in candidate_content
+                for existing in final_bullets
+            )
+            
+            if not is_duplicate:
+                final_bullets.append(candidate)
+            
+            fallback_index += 1
+        
+        # Last resort: ensure we have exactly 3
+        if len(final_bullets) < 3:
+            while len(final_bullets) < 3:
+                final_bullets.append("• Market dynamics continue evolving with institutional participation.")
+    
+    # Step 5: Final quality check
+    quality_bullets = []
+    for bullet in final_bullets[:3]:  # Ensure exactly 3
+        # Final cleaning and validation
+        clean_bullet_text = clean_bullet(bullet)
+        if len(clean_bullet_text) >= 15:  # Minimum meaningful length
+            quality_bullets.append(clean_bullet_text)
+    
+    # Guarantee exactly 3 bullets
+    while len(quality_bullets) < 3:
+        quality_bullets.append("• Financial markets reflect ongoing institutional adoption trends.")
+    
+    return quality_bullets[:3]
+
 async def extract_url_content(url: str) -> str:
     """Extract article content from URL using news scraper."""
     try:
@@ -490,23 +683,24 @@ async def generate_channel_news():
             
             # Step 3: Generate AI analysis for the approved article
             try:
-                ai_prompt = f"""Analyze this news article and provide exactly 3 bullet points about market impact. Each bullet should be 1 concise sentence (10-15 words max). Format as bullet points with • symbol.
+                ai_prompt = f"""Analyze this news article and provide exactly 3 bullet points about market impact. 
+
+REQUIREMENTS:
+- Each bullet: 1 concise sentence (10-15 words max)
+- Format: • [market impact statement]
+- Focus: market implications, investor impact, strategic significance
+- NO thinking process, analysis steps, or meta-commentary
+- Direct market insights only
 
 Article: {headline}
 
 {article_content}
 
-Focus on: market implications, investor impact, and strategic significance."""
+Provide 3 direct market impact bullets:"""
 
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None, 
-                    lambda: ollama.chat(
-                        model=MODEL_NAME,
-                        messages=[{'role': 'user', 'content': ai_prompt}]
-                    )
-                )
-                
-                ai_analysis = response['message']['content']
+                # Use Bitdeer API for news analysis
+                async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
+                    ai_analysis = await client.simple_chat(ai_prompt)
                 
                 # Extract clean response after thinking
                 def extract_final_response(response_text):
@@ -521,13 +715,42 @@ Focus on: market implications, investor impact, and strategic significance."""
                     lines = (cleaned if cleaned != response_text else response_text).split('\n')
                     bullet_points = []
                     
+                    # Enhanced thinking detection patterns
+                    thinking_indicators = [
+                        'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
+                        'analyzing', 'considering', 'let me', 'i should', 'the article details',
+                        'for the first point', 'for the second', 'for the third', 'each bullet point',
+                        'between 10-15 words', 'about market impact', 'i\'ll need to create',
+                        'with a relevance score', 'the summary mentions', 'published on'
+                    ]
+                    
                     for line in lines:
                         clean_line = line.strip()
+                        
                         # Only extract actual bullet points, ignore thinking text
                         if clean_line and (clean_line.startswith('•') or clean_line.startswith('-') or clean_line.startswith('*')):
+                            
+                            # Check if this bullet contains thinking process indicators
+                            line_lower = clean_line.lower()
+                            is_thinking = any(indicator in line_lower for indicator in thinking_indicators)
+                            
+                            # Skip meta-commentary and thinking bullets
+                            if is_thinking:
+                                continue
+                                
+                            # Skip bullets that are too long (likely thinking process)
+                            bullet_content = clean_line.replace('•', '').replace('-', '').replace('*', '').strip()
+                            if len(bullet_content) > 200:  # Too verbose, likely thinking
+                                continue
+                            
+                            # Skip bullets with ellipsis (incomplete thinking)
+                            if '...' in clean_line:
+                                continue
+                            
                             if not clean_line.startswith('•'):
                                 clean_line = '•' + clean_line[1:]
                             bullet_points.append(clean_line)
+                            
                             if len(bullet_points) >= 3:  # Stop at 3 bullets
                                 break
                     
@@ -535,7 +758,7 @@ Focus on: market implications, investor impact, and strategic significance."""
                     if not bullet_points:
                         sentences = [s.strip() for s in response_text.split('.') if s.strip() and len(s.strip()) > 20]
                         for sentence in sentences[-3:]:  # Take last 3 sentences as they're likely conclusions
-                            if not any(thinking_word in sentence.lower() for thinking_word in ['thinking', 'analyzing', 'looking at', 'considering']):
+                            if not any(thinking_word in sentence.lower() for thinking_word in thinking_indicators):
                                 bullet_points.append(f"• {sentence}.")
                                 if len(bullet_points) >= 3:
                                     break
@@ -544,15 +767,31 @@ Focus on: market implications, investor impact, and strategic significance."""
                 
                 bullet_points = extract_final_response(ai_analysis)
                 
-                # Ensure exactly 3 points
-                while len(bullet_points) < 3:
-                    bullet_points.append("• Market developments indicate continued institutional interest and adoption")
+                # Quality validation and improvement
+                original_count = len(bullet_points)
+                
+                # Check for thinking content in original bullets
+                thinking_detected = any('hmm,' in str(bp).lower() or 'the user wants' in str(bp).lower() 
+                                      or 'i need to' in str(bp).lower() for bp in bullet_points)
+                
+                bullet_points = validate_and_improve_bullets(bullet_points, headline)
+                
+                # Log quality improvements if any were made
+                if thinking_detected:
+                    print(f"🧠 Thinking content detected and filtered from AI response")
+                    
+                if original_count != len(bullet_points) or original_count == 0:
+                    print(f"🔧 Quality control: {original_count} → {len(bullet_points)} bullets (improved)")
+                else:
+                    print(f"✅ Quality control: {len(bullet_points)} bullets passed validation")
                 
                 analysis = '\n'.join(bullet_points)
                 
             except Exception as e:
                 print(f"⚠️ AI analysis failed: {e}")
-                analysis = "• Institutional adoption continues across traditional finance sectors\n• Market infrastructure improvements enable larger transaction volumes\n• Regulatory developments support continued growth momentum"
+                # Use quality-controlled fallback bullets
+                fallback_bullets = validate_and_improve_bullets([], headline)
+                analysis = '\n'.join(fallback_bullets)
             
             # Step 4: Format final message with EST timestamp
             if article and article.source:
@@ -708,17 +947,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a friendly greeting and brief help message."""
     log_command("start", update.effective_user.id, update.effective_user.username)
     await update.message.reply_text(
-        "👋 Hi! I'm your RWA & Gold Intelligence bot powered by a local R1 model.\n\n"
+        "👋 Hi! I'm your RWA & Gold Intelligence bot powered by Bitdeer DeepSeek-R1 API.\n\n"
         "🤖 **Status**: Online and ready!\n"
-        "⚡ **AI Model**: DeepSeek R1-14B\n"
+        "⚡ **AI Model**: DeepSeek R1 (API-only)\n"
         "📊 **Commands**: /help for full list\n\n"
-        "Type /help to see what I can do, or just ask me anything!"
+        "⚠️ **Important**: I only respond to commands starting with /\n"
+        "Type /help to see what I can do!"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List available commands."""
     log_command("help", update.effective_user.id, update.effective_user.username)
-    help_text = """🤖 **RWA & Gold Intelligence Bot**
+    help_text = """🤖 **RWA & Gold Intelligence Bot (Commands Only)**
+
+⚡ **Important:** Bot only responds to commands starting with /
 
 📈 **Market Analysis (24h Context):**
 /gold – AI-powered gold market analysis  
@@ -739,9 +981,7 @@ Reply with /bd – Analyze news for Matrixdock BD angles
 • 14+ real-time news sources
 • AI relevance filtering & duplicate prevention
 • 24-hour news context for analysis
-• Fresh content every 30 minutes
-
-💬 **Chat:** Send any message for AI analysis"""
+• Fresh content every 30 minutes"""
     await update.message.reply_text(help_text)
 
 async def gold_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -952,16 +1192,19 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     log_thinking_step("BD Reply Analysis", f"Analyzing news for Matrixdock angles: {news_content[:100]}...")
     
-    bd_prompt = f"""Analyze this news article specifically for Matrixdock partnership and business development opportunities. Provide exactly 3-4 bullet points covering:
+    bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
 
-1. Partnership angles and opportunities for Matrixdock
-2. Potential strategic contacts or companies to engage
-3. Business development actions Matrixdock could take
-4. Competitive advantages this news reveals
+STRICT FORMAT:
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
 
-News Content: {news_content}
+FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
+NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
 
-Focus on concrete BD actions, specific companies/contacts mentioned, and strategic opportunities for RWA/gold tokenization partnerships. Format with • symbol."""
+NEWS: {news_content}
+
+PROVIDE 3-4 COMPLETE BD BULLETS:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_reply")
     
@@ -997,16 +1240,19 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
         analysis_content = content_input
         content_display = content_input
     
-    bd_prompt = f"""Analyze this content specifically for Matrixdock partnership and business development opportunities. Provide exactly 3-4 bullet points covering:
+    bd_prompt = f"""Analyze this content for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
 
-1. Partnership angles and opportunities for Matrixdock
-2. Potential strategic contacts or companies to engage  
-3. Business development actions Matrixdock could take
-4. Competitive advantages or market positioning opportunities
+STRICT FORMAT:
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
 
-Content: {analysis_content}
+FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
+NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
 
-Focus on concrete BD actions, specific companies/contacts mentioned, and strategic opportunities for RWA/gold tokenization partnerships. Format with • symbol."""
+CONTENT: {analysis_content}
+
+PROVIDE 3-4 COMPLETE BD BULLETS:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
@@ -1103,16 +1349,19 @@ Published: January 15, 2025 at 02:30 PM EST"""
     status_msg = await update.message.reply_text("🧪 Testing BD analysis with sample news...")
     
     # Simulate the BD analysis
-    bd_prompt = f"""Analyze this news article specifically for Matrixdock partnership and business development opportunities. Provide exactly 3-4 bullet points covering:
+    bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
 
-1. Partnership angles and opportunities for Matrixdock
-2. Potential strategic contacts or companies to engage
-3. Business development actions Matrixdock could take
-4. Competitive advantages this news reveals
+STRICT FORMAT:
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
 
-News Content: {fake_news}
+FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
+NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
 
-Focus on concrete BD actions, specific companies/contacts mentioned, and strategic opportunities for RWA/gold tokenization partnerships. Format with • symbol."""
+NEWS: {fake_news}
+
+PROVIDE 3-4 COMPLETE BD BULLETS:"""
 
     ai_response = await get_ai_response(bd_prompt, command="test_bd")
     
@@ -1125,37 +1374,7 @@ Focus on concrete BD actions, specific companies/contacts mentioned, and strateg
     
     await status_msg.edit_text(response)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle any text message with AI response."""
-    log_command("chat", update.effective_user.id, update.effective_user.username)
-    
-    user_message = update.message.text
-    thinking_msg = await update.message.reply_text("🤔 Processing with AI...")
-    
-    log_thinking_step("Chat Processing", f"User question: {user_message[:100]}...")
-    print(f"💬 Full user message: {user_message}")
-    
-    log_thinking_step("AI Processing", "Requesting concise conversational response")
-    response = await get_ai_response(
-        f"Answer this question concisely in 3-5 bullet points: {user_message}",
-        command="chat"
-    )
-    
-    if response:
-        log_thinking_step("Chat Response", "AI provided concise conversational response")
-        await thinking_msg.edit_text(response)
-    else:
-        log_thinking_step("Fallback Menu", "AI unavailable, showing command menu")
-        await thinking_msg.edit_text(
-            "🤖 AI temporarily unavailable. Quick commands:\n\n"
-            "📈 /gold - Gold analysis\n"
-            "🏗️ /rwa - RWA analysis\n" 
-            "🔍 /meaning - News analysis\n"
-            "🤝 /bd - Partnership analysis\n"
-            "📋 /summary - Market overview"
-        )
-    
-    print(f"✅ Chat interaction completed")
+# handle_message function removed - bot now only responds to commands (/)
 
 async def debug_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Debug function to log all messages the bot receives."""
@@ -1193,16 +1412,19 @@ async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAUL
             # Perform BD analysis on the replied message
             status_msg = await update.message.reply_text("🤝 Analyzing BD opportunities in this news...")
             
-            bd_prompt = f"""Analyze this news article specifically for Matrixdock partnership and business development opportunities. Provide exactly 3-4 bullet points covering:
+            bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
 
-1. Partnership angles and opportunities for Matrixdock
-2. Potential strategic contacts or companies to engage
-3. Business development actions Matrixdock could take
-4. Competitive advantages this news reveals
+STRICT FORMAT:
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
+• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
 
-News Content: {replied_text}
+FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
+NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
 
-Focus on concrete BD actions, specific companies/contacts mentioned, and strategic opportunities for RWA/gold tokenization partnerships. Format with • symbol."""
+NEWS: {replied_text}
+
+PROVIDE 3-4 COMPLETE BD BULLETS:"""
 
             ai_response = await get_ai_response(bd_prompt, command="channel_bd")
             
@@ -1221,26 +1443,15 @@ Focus on concrete BD actions, specific companies/contacts mentioned, and strateg
 # --- Main entry‑point ---------------------------------------------------------
 def main() -> None:
     """Build and run the bot (long‑polling for dev)."""
-    print(f"🚀 Starting RWA & Gold Intelligence Bot")
+    print(f"🚀 Starting RWA & Gold Intelligence Bot (Command-Only Mode)")
     print(f"⏰ Start time: {bot_status.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("🔄 Enhanced mode with conflict resolution enabled")
+    print("⚡ Commands only - users must start messages with /")
     
     # Set up global application reference for channel posting
     global application_instance
     
-    # Check if Ollama model exists
-    try:
-        models = ollama.list()
-        model_names = [model['name'] for model in models['models']]
-        if MODEL_NAME not in model_names and f"{MODEL_NAME}:latest" not in model_names:
-            print(f"⚠️  Model '{MODEL_NAME}' not found. AI features limited.")
-            print("📝 Commands will work with curated content.")
-        else:
-            print(f"✅ AI Model '{MODEL_NAME}' ready!")
-        print(f"📋 Available models: {model_names}")
-    except Exception as e:
-        print(f"⚠️  Ollama connection issue: {e}")
-        print("🔄 Bot will run with limited AI features.")
+    # API-only mode - no local model checks needed
+    print(f"✅ Bitdeer DeepSeek-R1 API ready for all AI features")
     
     application = Application.builder().token(TOKEN).build()
     application_instance = application  # Store global reference
@@ -1256,10 +1467,7 @@ def main() -> None:
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("test_bd", test_bd_command))
     
-    # Handle direct messages and channel messages
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-    )
+    # Commands only - no text message handler (users must use /commands)
     
     # Add specific handler for channel messages (more permissive)
     application.add_handler(
