@@ -104,8 +104,26 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
         if debug_mode:
             print("⚡ Sending request to Bitdeer DeepSeek-R1...")
         
+        # Set higher token limit for BD commands since they need complete business recommendations
+        max_tokens = 600 if command.startswith("bd") else 300
+        
         async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
-            ai_response = await client.simple_chat(full_prompt, context)
+            # Use chat_completion with custom token limits instead of simple_chat
+            messages = []
+            if context:
+                messages.append({"role": "system", "content": context})
+            messages.append({"role": "user", "content": full_prompt})
+            
+            result = await client.chat_completion(messages, max_tokens=max_tokens)
+            
+            if "choices" in result and len(result["choices"]) > 0:
+                message = result["choices"][0]["message"]
+                # For DeepSeek-R1: content has final answer, reasoning_content has thinking
+                ai_response = message.get("content", "") or message.get("reasoning_content", "")
+                if not ai_response:
+                    raise Exception("Empty response from AI")
+            else:
+                raise Exception("No response generated from AI")
         
         if debug_mode:
             print(f"✅ Bitdeer API response: {len(ai_response)} chars")
@@ -133,7 +151,10 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                     'for the first point', 'for the second', 'for the third', 'each bullet point',
                     'between 10-15 words', 'about market impact', 'i\'ll need to create',
                     'with a relevance score', 'the summary mentions', 'published on',
-                    'the user wants me to', 'i\'ll need to', 'bullet points about'
+                    'the user wants me to', 'i\'ll need to', 'bullet points about',
+                    'the news states that', 'the requirements are', 'for the first opportunity',
+                    'i consider', 'the first angle', 'the second angle', 'the third angle',
+                    'first, i', 'second, i', 'third, i', 'i\'ll focus on', 'i\'ll identify'
                 ]
                 return any(indicator in text_lower for indicator in thinking_indicators)
             
@@ -159,22 +180,34 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                     if len(bullet_content) > 200:  # Too verbose, likely thinking
                         continue
                     
-                    # Skip bullets with ellipsis or incomplete content
-                    if ('...' in line or 
+                    # Skip bullets with obvious problems (for news generation)
+                    if ('...' in line or  # Any incomplete content with ellipsis
                         line.count('•') > 1 or  # Multiple bullets on one line
-                        bullet_content.count(' ') < 3 or  # Too short (less than 4 words)
-                        line.endswith('(e.g.,') or line.endswith('(e.g.') or  # Incomplete examples
                         bullet_content.strip() in ['', '...', '•'] or  # Empty or just symbols
-                        len(bullet_content) < 15):  # Too short to be meaningful
+                        len(bullet_content) < 15 or  # Too short to be meaningful
+                        is_thinking_content(bullet_content)):  # Contains thinking indicators
                         continue
                     
                     if not line.startswith('•'):
                         line = '•' + line[1:]  # Standardize to •
                     bullet_lines.append(line)
             
-            # If we found clean bullet points, return those
+            # If we found bullet points, do simple cleanup
             if bullet_lines:
-                return '\n'.join(bullet_lines)
+                # Simple cleanup pass
+                cleaned_bullets = []
+                for bullet in bullet_lines:
+                    # Fix double bullet markers and clean whitespace
+                    cleaned_bullet = bullet.replace('• •', '•').replace('••', '•').strip()
+                    
+                    # Keep if it has reasonable content
+                    content = cleaned_bullet.replace('•', '').strip()
+                    if len(content) >= 10 and not is_thinking_content(content):
+                        cleaned_bullets.append(cleaned_bullet)
+                
+                # Return if we have any decent bullets
+                if cleaned_bullets:
+                    return '\n'.join(cleaned_bullets)
             
             # Fallback: look for non-thinking sentences
             sentences = [s.strip() for s in response_text.split('.') if s.strip() and len(s.strip()) > 20]
@@ -200,13 +233,51 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
             
             return '\n'.join(final_lines).strip()
         
-        # Apply thinking detection to all AI responses
-        original_response = ai_response
-        ai_response = extract_final_response(ai_response)
+        def extract_bd_response(response_text):
+            """Simple BD response extraction - minimal filtering since token limit issue is fixed."""
+            import re
+            
+            # Remove <think> blocks if present
+            cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL | re.IGNORECASE)
+            
+            # Only filter obvious thinking patterns, keep business content
+            lines = cleaned.split('\n')
+            final_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Only filter obvious thinking indicators
+                line_lower = line.lower()
+                if any(phrase in line_lower for phrase in [
+                    'alright, the user', 'let me start by', 'i need to analyze',
+                    'the user is asking', 'first, i need to', 'let me recall'
+                ]):
+                    continue
+                
+                # Fix formatting
+                line = line.replace('• •', '•').replace('••', '•')
+                final_lines.append(line)
+            
+            return '\n'.join(final_lines).strip() if final_lines else response_text
         
-        # Log if thinking content was filtered
+        # Apply different filtering based on command type
+        original_response = ai_response
+        
+        if command.startswith("bd"):
+            # Light filtering for BD commands - just remove obvious thinking
+            ai_response = extract_bd_response(ai_response)
+        else:
+            # Full filtering for news and other commands
+            ai_response = extract_final_response(ai_response)
+        
+        # Log if content was filtered
         if debug_mode and len(original_response) > len(ai_response):
-            print(f"🧠 Thinking content filtered: {len(original_response)} → {len(ai_response)} chars")
+            print(f"🧠 Content filtered: {len(original_response)} → {len(ai_response)} chars")
+            if command.startswith("bd"):
+                print(f"🤝 BD light filtering applied for command: {command}")
         
         # Truncate if too long
         if len(ai_response) > MAX_MESSAGE_LENGTH:
@@ -1192,19 +1263,17 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     log_thinking_step("BD Reply Analysis", f"Analyzing news for Matrixdock angles: {news_content[:100]}...")
     
-    bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
+    bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
+- Companies to contact (CEO/CTO/CFO names if mentioned) 
+- Partnerships to propose
+- Meetings to schedule
+- Services to pitch
 
-STRICT FORMAT:
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+Don't give market analysis - give specific business actions.
 
-FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
-NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
+News: {news_content}
 
-NEWS: {news_content}
-
-PROVIDE 3-4 COMPLETE BD BULLETS:"""
+Specific actions for Matrixdock's BD team:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_reply")
     
@@ -1240,19 +1309,17 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
         analysis_content = content_input
         content_display = content_input
     
-    bd_prompt = f"""Analyze this content for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
+    bd_prompt = f"""What specific business actions should Matrixdock take based on this content? Focus on:
+- Companies to contact (CEO/CTO/CFO names if mentioned) 
+- Partnerships to propose
+- Meetings to schedule
+- Services to pitch
 
-STRICT FORMAT:
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+Don't give market analysis - give specific business actions.
 
-FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
-NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
+Content: {analysis_content}
 
-CONTENT: {analysis_content}
-
-PROVIDE 3-4 COMPLETE BD BULLETS:"""
+Specific actions for Matrixdock's BD team:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
@@ -1349,19 +1416,17 @@ Published: January 15, 2025 at 02:30 PM EST"""
     status_msg = await update.message.reply_text("🧪 Testing BD analysis with sample news...")
     
     # Simulate the BD analysis
-    bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
+    bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
+- Companies to contact (CEO/CTO/CFO names if mentioned) 
+- Partnerships to propose
+- Meetings to schedule
+- Services to pitch
 
-STRICT FORMAT:
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+Don't give market analysis - give specific business actions.
 
-FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
-NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
+News: {fake_news}
 
-NEWS: {fake_news}
-
-PROVIDE 3-4 COMPLETE BD BULLETS:"""
+Specific actions for Matrixdock's BD team:"""
 
     ai_response = await get_ai_response(bd_prompt, command="test_bd")
     
@@ -1412,19 +1477,17 @@ async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAUL
             # Perform BD analysis on the replied message
             status_msg = await update.message.reply_text("🤝 Analyzing BD opportunities in this news...")
             
-            bd_prompt = f"""Analyze this news for Matrixdock BD opportunities. Provide exactly 3-4 COMPLETE bullet points:
+            bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
+- Companies to contact (CEO/CTO/CFO names if mentioned) 
+- Partnerships to propose
+- Meetings to schedule
+- Services to pitch
 
-STRICT FORMAT:
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]  
-• [Complete actionable insight - minimum 8 words, specific company/action mentioned]
+Don't give market analysis - give specific business actions.
 
-FOCUS: Partnership angles, strategic contacts, BD actions, competitive advantages
-NO: Thinking, analysis steps, incomplete sentences, "e.g." examples
+News: {replied_text}
 
-NEWS: {replied_text}
-
-PROVIDE 3-4 COMPLETE BD BULLETS:"""
+Specific actions for Matrixdock's BD team:"""
 
             ai_response = await get_ai_response(bd_prompt, command="channel_bd")
             
