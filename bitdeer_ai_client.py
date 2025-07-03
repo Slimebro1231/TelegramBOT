@@ -176,8 +176,26 @@ class BitdeerAIClient:
                 )
                 
                 if is_bullet_line:
+                    # Fix double bullets first
+                    line = re.sub(r'•\s*•\s*', '• ', line)  # Fix • • to single •
+                    line = re.sub(r'••+', '• ', line)  # Fix multiple bullets
+                    
                     # Clean up bullet point formatting
                     clean_line = self._clean_bullet_formatting(line)
+                    
+                    # Skip bullets that are clearly incomplete or thinking process
+                    if clean_line and clean_line.startswith('• '):
+                        bullet_content = clean_line[2:].strip()
+                        # Skip if incomplete, contains thinking indicators, or too short
+                        if (len(bullet_content) < 20 or 
+                            bullet_content.endswith('...') or 
+                            not bullet_content.endswith('.') or
+                            any(phrase in bullet_content.lower() for phrase in [
+                                'next,', 'first,', 'second,', 'third,', 'if tokenized', 
+                                'traditional retail', 'investor impact', 'market partic',
+                                'hmm,', 'the user wants', 'i need to', 'analyzing', 'considering'
+                            ])):
+                            continue
                     
                     # Only keep substantial bullet points (not headers or short fragments)
                     if clean_line and len(clean_line) > 30 and not clean_line.endswith(':'):

@@ -34,6 +34,7 @@ import random
 from news_scraper import get_single_relevant_article, format_article_for_ai, NewsArticle, get_tracker_stats, NewsScraper
 from conflict_resolution import nuclear_conflict_resolution, ultra_robust_polling_start, should_use_conflict_resolution, should_use_ultra_robust_polling
 from bitdeer_ai_client import BitdeerAIClient
+import html
 
 # --- Config ------------------------------------------------------------------
 load_dotenv()  # take environment variables from .env, if present
@@ -105,7 +106,7 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
             print("⚡ Sending request to Bitdeer DeepSeek-R1...")
         
         # Set higher token limit for BD commands since they need complete business recommendations
-        max_tokens = 600 if command.startswith("bd") else 300
+        max_tokens = 800 if command.startswith("bd") else 300
         
         async with BitdeerAIClient(DEEPSEEK_API_KEY) as client:
             # Use chat_completion with custom token limits instead of simple_chat
@@ -154,7 +155,9 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                     'the user wants me to', 'i\'ll need to', 'bullet points about',
                     'the news states that', 'the requirements are', 'for the first opportunity',
                     'i consider', 'the first angle', 'the second angle', 'the third angle',
-                    'first, i', 'second, i', 'third, i', 'i\'ll focus on', 'i\'ll identify'
+                    'first, i', 'second, i', 'third, i', 'i\'ll focus on', 'i\'ll identify',
+                    'next, investor impact', 'if tokenized stocks face', 'traditional retail investors might',
+                    'here are concrete', 'here are specific', 'leveraging the regulatory'
                 ]
                 return any(indicator in text_lower for indicator in thinking_indicators)
             
@@ -236,11 +239,23 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
         def extract_bd_response(response_text):
             """Simple BD response extraction - minimal filtering since token limit issue is fixed."""
             import re
+            import html
             
             # Remove <think> blocks if present
             cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL | re.IGNORECASE)
             
-            # Only filter obvious thinking patterns, keep business content
+            # Fix HTML entities (&#039; becomes ', &quot; becomes ", etc.)
+            cleaned = html.unescape(cleaned)
+            
+            # Remove markdown formatting for Telegram
+            # Remove **bold** formatting
+            cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)
+            # Remove *italic* formatting  
+            cleaned = re.sub(r'\*([^*]+)\*', r'\1', cleaned)
+            # Remove remaining asterisks
+            cleaned = re.sub(r'\*+', '', cleaned)
+            
+            # Split into lines and filter
             lines = cleaned.split('\n')
             final_lines = []
             
@@ -249,19 +264,46 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                 if not line:
                     continue
                 
-                # Only filter obvious thinking indicators
+                # Filter out obvious thinking process lines
                 line_lower = line.lower()
                 if any(phrase in line_lower for phrase in [
                     'alright, the user', 'let me start by', 'i need to analyze',
-                    'the user is asking', 'first, i need to', 'let me recall'
+                    'the user is asking', 'first, i need to', 'let me recall',
+                    'next, investor impact', 'if tokenized stocks face',
+                    'traditional retail investors might', 'here are concrete',
+                    'here are specific', 'leveraging the regulatory'
                 ]):
                     continue
                 
-                # Fix formatting
-                line = line.replace('• •', '•').replace('••', '•')
-                final_lines.append(line)
+                # Fix double bullets and clean formatting
+                line = re.sub(r'•\s*•\s*', '• ', line)  # Fix • • to single •
+                line = re.sub(r'••+', '• ', line)  # Fix multiple bullets
+                line = re.sub(r'^\s*•\s*$', '', line)  # Remove empty bullets
+                
+                # Skip bullets that are clearly incomplete or thinking process
+                if line.startswith('• '):
+                    bullet_content = line[2:].strip()
+                    # Skip if too short, incomplete, or contains thinking indicators
+                    if (len(bullet_content) < 20 or 
+                        bullet_content.endswith('...') or 
+                        bullet_content.endswith('.') == False or
+                        any(phrase in bullet_content.lower() for phrase in [
+                            'next,', 'first,', 'second,', 'third,', 'if tokenized', 
+                            'traditional retail', 'investor impact', 'market partic'
+                        ])):
+                        continue
+                
+                # Keep the line if it passes filters
+                if line:
+                    final_lines.append(line)
             
-            return '\n'.join(final_lines).strip() if final_lines else response_text
+            # Join with proper spacing and clean up
+            result = '\n'.join(final_lines).strip()
+            
+            # Add line breaks between sections for better readability
+            result = re.sub(r'([.:])\s*([A-Z][a-z]+\s+[A-Z])', r'\1\n\n\2', result)
+            
+            return result if result else response_text
         
         # Apply different filtering based on command type
         original_response = ai_response
@@ -1229,7 +1271,7 @@ async def bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     log_thinking_step("BD Analysis", "Requesting Matrixdock-focused partnership analysis")
     
     ai_response = await get_ai_response(
-        "Provide exactly 3 bullet points about crypto exchange partnership opportunities. Each point should be 1-2 sentences max. Start each with • symbol.\n\nTopics: liquidity partnerships, market expansion, institutional services\n\nFormat: • [Brief opportunity description]",
+        "Provide exactly 3 realistic business development opportunities for Matrixdock (tokenized treasury platform). Focus on actionable steps the BD team can take this week:\n\n• Mid-tier crypto exchanges or fintech platforms to contact\n• Partnership proposals that match Matrixdock's scale\n• Specific outreach actions or services to pitch\n\nFormat as bullet points with concrete next steps, avoid Fortune 500 companies.",
         command="bd"
     )
     
@@ -1263,17 +1305,18 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     log_thinking_step("BD Reply Analysis", f"Analyzing news for Matrixdock angles: {news_content[:100]}...")
     
-    bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
-- Companies to contact (CEO/CTO/CFO names if mentioned) 
-- Partnerships to propose
-- Meetings to schedule
-- Services to pitch
+    bd_prompt = f"""Based on this news, what specific business actions should Matrixdock (tokenized treasury platform) take? Focus on realistic, actionable steps:
 
-Don't give market analysis - give specific business actions.
+- Mid-tier companies/platforms to contact (not Fortune 500 CEOs)
+- Partnership proposals that match Matrixdock's scale
+- Specific outreach actions the BD team can take this week
+- Services/solutions to pitch that align with the news
+
+Format as bullet points with concrete next steps, not aspirational goals.
 
 News: {news_content}
 
-Specific actions for Matrixdock's BD team:"""
+Realistic actions for Matrixdock's BD team:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_reply")
     
@@ -1309,17 +1352,18 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
         analysis_content = content_input
         content_display = content_input
     
-    bd_prompt = f"""What specific business actions should Matrixdock take based on this content? Focus on:
-- Companies to contact (CEO/CTO/CFO names if mentioned) 
-- Partnerships to propose
-- Meetings to schedule
-- Services to pitch
+    bd_prompt = f"""Based on this content, what specific business actions should Matrixdock (tokenized treasury platform) take? Focus on realistic, actionable steps:
 
-Don't give market analysis - give specific business actions.
+- Mid-tier companies/platforms to contact (not Fortune 500 CEOs)
+- Partnership proposals that match Matrixdock's scale  
+- Specific outreach actions the BD team can take this week
+- Services/solutions to pitch that align with the content
+
+Format as bullet points with concrete next steps, not aspirational goals.
 
 Content: {analysis_content}
 
-Specific actions for Matrixdock's BD team:"""
+Realistic actions for Matrixdock's BD team:"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
