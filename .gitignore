@@ -8,6 +8,17 @@
 *.key
 *.pem
 config.ini
+TelegramBot-Key.pem
+
+# VM and Deployment Files - Keep these local only
+vm_setup_helper.sh
+deploy.sh
+bot_console.sh
+*.pem
+*-Key.pem
+vm_*.log
+deployment_*.log
+bot_control.sh
 
 # API Keys and Tokens (double-check these patterns)
 *token*

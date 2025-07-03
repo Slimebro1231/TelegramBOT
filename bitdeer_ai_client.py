@@ -57,7 +57,7 @@ class BitdeerAIClient:
                     return result
                 else:
                     error_text = await response.text()
-                    print(f"🐞 DEBUG - API Error Details:")
+                    print(f" DEBUG - API Error Details:")
                     print(f"   Status: {response.status}")
                     print(f"   Headers: {dict(response.headers)}")
                     print(f"   Error: {error_text[:200]}")
