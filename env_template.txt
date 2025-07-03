@@ -1,0 +1,29 @@
+# API Configuration - Replace with your actual values
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+DEEPSEEK_API=your_bitdeer_deepseek_api_key_here
+TELEGRAM_CHANNEL_ID=your_telegram_channel_id_here
+
+# Optional Settings
+DEBUG_MODE=false
+NEWS_INTERVAL=1800
+MAX_MESSAGE_LENGTH=4096
+
+# Bot Configuration
+BOT_USERNAME=your_bot_username
+
+# News Sources (optional overrides)
+# Uncomment and modify if needed
+# RSS_INTERVAL=1800
+# MAX_ARTICLES_PER_FETCH=50
+
+# Logging
+# LOG_LEVEL=INFO
+
+# AI Model Settings (optional)
+# AI_TEMPERATURE=0.7
+# AI_MAX_TOKENS=300
+
+# Instructions:
+# 1. Copy this file to .env: cp env_template.txt .env
+# 2. Replace all "your_*_here" values with actual credentials
+# 3. Never commit the .env file to GitHub (it's in .gitignore) 
