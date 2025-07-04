@@ -230,6 +230,87 @@ class DevDeploy:
             for line in stdout.split('\n')[-5:]:
                 if line.strip():
                     print(f"  {line}")
+    
+    def sync_news_tracker(self):
+        """Sync news_tracker.json bidirectionally, keeping the most up-to-date version"""
+        self.log("Syncing news_tracker.json...")
+        
+        local_file = "news_tracker.json"
+        remote_file = f"{BOT_DIR}/news_tracker.json"
+        
+        try:
+            # Get local file modification time
+            local_mtime = 0
+            if os.path.exists(local_file):
+                local_mtime = os.path.getmtime(local_file)
+                local_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_mtime))
+                self.log(f"Local news_tracker.json: {local_time_str}")
+            else:
+                self.log("No local news_tracker.json found")
+            
+            # Get remote file modification time
+            stdout, stderr, code = self.run_ssh_command(f"stat -c %Y {remote_file} 2>/dev/null || echo 0")
+            remote_mtime = 0
+            if code == 0 and stdout.strip().isdigit():
+                remote_mtime = int(stdout.strip())
+                remote_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(remote_mtime))
+                self.log(f"Remote news_tracker.json: {remote_time_str}")
+            else:
+                self.log("No remote news_tracker.json found")
+            
+            # Determine sync direction
+            if local_mtime == 0 and remote_mtime == 0:
+                self.log("No news_tracker.json found on either side - will create new")
+                return True
+            elif local_mtime == 0:
+                # Download from remote
+                self.log("Downloading news_tracker.json from VM...")
+                command = f"scp -i {SSH_KEY} {VM_USER}@{VM_IP}:{remote_file} {local_file}"
+                result = subprocess.run(command, shell=True, capture_output=True)
+                if result.returncode == 0:
+                    self.log("Downloaded news_tracker.json from VM", "SUCCESS")
+                else:
+                    self.log(f"Failed to download: {result.stderr.decode()}", "ERROR")
+                    return False
+            elif remote_mtime == 0:
+                # Upload to remote
+                self.log("Uploading news_tracker.json to VM...")
+                command = f"scp -i {SSH_KEY} {local_file} {VM_USER}@{VM_IP}:{remote_file}"
+                result = subprocess.run(command, shell=True, capture_output=True)
+                if result.returncode == 0:
+                    self.log("Uploaded news_tracker.json to VM", "SUCCESS")
+                else:
+                    self.log(f"Failed to upload: {result.stderr.decode()}", "ERROR")
+                    return False
+            elif remote_mtime > local_mtime:
+                # Remote is newer, download
+                self.log("Remote news_tracker.json is newer - downloading...")
+                command = f"scp -i {SSH_KEY} {VM_USER}@{VM_IP}:{remote_file} {local_file}"
+                result = subprocess.run(command, shell=True, capture_output=True)
+                if result.returncode == 0:
+                    self.log("Downloaded newer news_tracker.json from VM", "SUCCESS")
+                else:
+                    self.log(f"Failed to download: {result.stderr.decode()}", "ERROR")
+                    return False
+            elif local_mtime > remote_mtime:
+                # Local is newer, upload
+                self.log("Local news_tracker.json is newer - uploading...")
+                command = f"scp -i {SSH_KEY} {local_file} {VM_USER}@{VM_IP}:{remote_file}"
+                result = subprocess.run(command, shell=True, capture_output=True)
+                if result.returncode == 0:
+                    self.log("Uploaded newer news_tracker.json to VM", "SUCCESS")
+                else:
+                    self.log(f"Failed to upload: {result.stderr.decode()}", "ERROR")
+                    return False
+            else:
+                # Files are the same age
+                self.log("news_tracker.json files are synchronized", "SUCCESS")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error syncing news_tracker.json: {str(e)}", "ERROR")
+            return False
 
 def main():
     if len(sys.argv) < 2:
@@ -264,6 +345,10 @@ def main():
             deployer.log("Local test failed - aborting deployment", "ERROR")
             sys.exit(1)
         
+        # Sync news_tracker.json before deployment
+        if not deployer.sync_news_tracker():
+            deployer.log("Failed to sync news_tracker.json", "WARNING")
+        
         # Deploy to VM
         if not deployer.stop_vm_bot():
             sys.exit(1)
@@ -277,6 +362,10 @@ def main():
         if not deployer.start_vm_bot():
             sys.exit(1)
         
+        # Sync news_tracker.json after deployment
+        if not deployer.sync_news_tracker():
+            deployer.log("Failed to sync news_tracker.json after deployment", "WARNING")
+        
         deployer.show_vm_status()
         deployer.log("Deployment completed successfully! 🎉", "SUCCESS")
     
@@ -285,6 +374,10 @@ def main():
             sys.exit(1)
         
         deployer.log("Force deploying without local testing...")
+        
+        # Sync news_tracker.json before deployment
+        if not deployer.sync_news_tracker():
+            deployer.log("Failed to sync news_tracker.json", "WARNING")
         
         if not deployer.stop_vm_bot():
             sys.exit(1)
@@ -297,6 +390,10 @@ def main():
         
         if not deployer.start_vm_bot():
             sys.exit(1)
+        
+        # Sync news_tracker.json after deployment
+        if not deployer.sync_news_tracker():
+            deployer.log("Failed to sync news_tracker.json after deployment", "WARNING")
         
         deployer.show_vm_status()
         deployer.log("Force deployment completed! 🎉", "SUCCESS")

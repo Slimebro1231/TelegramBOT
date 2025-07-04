@@ -18,15 +18,61 @@ import asyncio
 import os
 
 def kill_competing_processes():
-    """Kill ALL competing python/bot processes aggressively."""
+    """Kill competing python/bot processes, but NOT the current process."""
     print("🧹 Killing competing processes...")
     
     try:
-        # Kill ALL python processes that might conflict
-        subprocess.run(["pkill", "-9", "-f", "python"], capture_output=True)
-        subprocess.run(["pkill", "-9", "-f", "bot.py"], capture_output=True)
-        subprocess.run(["pkill", "-9", "-f", "telegram"], capture_output=True)
-        print("✅ Killed ALL competing processes")
+        current_pid = os.getpid()
+        parent_pid = os.getppid()
+        print(f"🔒 Protecting current process PID: {current_pid}")
+        print(f"🔒 Protecting parent process PID: {parent_pid}")
+        
+        # Get more specific process list - only exact matches
+        result = subprocess.run(["pgrep", "-f", "python.*bot\\.py"], capture_output=True, text=True)
+        if result.stdout:
+            pids = result.stdout.strip().split('\n')
+            print(f"🔍 Found {len(pids)} potential bot processes: {pids}")
+            
+            for pid in pids:
+                if pid and pid.strip():
+                    pid = pid.strip()
+                    # Skip if it's the current process or parent process
+                    if pid in [str(current_pid), str(parent_pid)]:
+                        print(f"🔒 Skipping protected process PID: {pid}")
+                        continue
+                    
+                    # Double-check the process before killing
+                    try:
+                        # Get process details to verify it's actually a competing bot
+                        check_result = subprocess.run(
+                            ["ps", "-p", pid, "-o", "cmd="], 
+                            capture_output=True, text=True
+                        )
+                        if check_result.returncode == 0:
+                            cmd_line = check_result.stdout.strip()
+                            print(f"🔍 Process {pid} command: {cmd_line}")
+                            
+                            # Only kill if it's actually a bot.py process and not our current process
+                            if "bot.py" in cmd_line and pid not in [str(current_pid), str(parent_pid)]:
+                                subprocess.run(["kill", "-TERM", pid], capture_output=True)  # Use TERM instead of -9
+                                print(f"✅ Terminated competing process PID: {pid}")
+                                time.sleep(2)  # Give it time to shutdown gracefully
+                                
+                                # Check if it's still running, then use KILL
+                                check_again = subprocess.run(["ps", "-p", pid], capture_output=True)
+                                if check_again.returncode == 0:
+                                    subprocess.run(["kill", "-9", pid], capture_output=True)
+                                    print(f"🔪 Force killed stubborn process PID: {pid}")
+                            else:
+                                print(f"🔒 Skipping non-bot process PID: {pid}")
+                        else:
+                            print(f"⚠️ Process {pid} no longer exists")
+                    except Exception as e:
+                        print(f"⚠️ Failed to check/kill PID {pid}: {e}")
+        else:
+            print("✅ No competing bot processes found")
+        
+        print("✅ Process cleanup complete (protected current process)")
         time.sleep(3)
     except Exception as e:
         print(f"⚠️ Process killing failed: {e}")
@@ -136,6 +182,7 @@ async def ultra_robust_polling_start(application, token: str, max_retries: int =
             print(f"🚀 Starting polling (attempt {attempt + 1}/{max_retries})...")
             
             # Try to start polling with maximum robustness
+            # This should block and keep polling active like the regular start_polling
             await application.updater.start_polling(
                 drop_pending_updates=True,
                 allowed_updates=None,
@@ -143,7 +190,8 @@ async def ultra_robust_polling_start(application, token: str, max_retries: int =
                 poll_interval=2.0
             )
             print("✅ Polling started successfully")
-            return True
+            # Don't return here - let the polling continue running
+            break
             
         except Conflict as e:
             print(f"⚠️ Conflict detected (attempt {attempt + 1}): {str(e)}")
@@ -180,11 +228,13 @@ async def ultra_robust_polling_start(application, token: str, max_retries: int =
             else:
                 raise
     
-    return False
+    # If we get here, polling should be running successfully
+    # The function should not return until polling stops
+    return True
 
 # Configuration options
 ENABLE_NUCLEAR_RESOLUTION = True  # Set to False to disable when system is stable
-ENABLE_ULTRA_ROBUST_POLLING = True  # Set to False for simple polling
+ENABLE_ULTRA_ROBUST_POLLING = False  # Set to False for simple polling
 
 def should_use_conflict_resolution():
     """Check if conflict resolution should be used."""

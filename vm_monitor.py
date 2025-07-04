@@ -138,6 +138,234 @@ class VMMonitor:
         else:
             print(f"❌ Failed to {action} bot: {stderr}")
     
+    def virtual_terminal(self):
+        """Virtual terminal mode - live logs + bot interaction"""
+        print("\n🖥️ VIRTUAL TERMINAL MODE")
+        print("=" * 60)
+        print("📺 Live logs will appear below")
+        print("⌨️ Type commands in format: CMD> your_command")
+        print("🔄 Available commands: next, verify, status, restart, stop")
+        print("❌ Type 'exit' to leave virtual terminal")
+        print("💡 Bot continues running when you disconnect")
+        print("=" * 60)
+        
+        import threading
+        import queue
+        import select
+        import sys
+        
+        # Queue for commands
+        command_queue = queue.Queue()
+        stop_threads = threading.Event()
+        
+        def log_streamer():
+            """Stream logs in real-time"""
+            try:
+                import subprocess
+                import fcntl
+                import os
+                
+                # Start journalctl follow process
+                cmd = f"{self.ssh_base} 'journalctl -u telegram-bot.service -f --no-pager'"
+                proc = subprocess.Popen(
+                    cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                # Make stdout non-blocking
+                fd = proc.stdout.fileno()
+                fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+                
+                while not stop_threads.is_set():
+                    try:
+                        ready, _, _ = select.select([proc.stdout], [], [], 0.1)
+                        if ready:
+                            line = proc.stdout.readline()
+                            if line:
+                                # Clean up the log line and print it
+                                clean_line = line.strip()
+                                if clean_line and not clean_line.startswith('-- '):
+                                    timestamp = datetime.now().strftime("%H:%M:%S")
+                                    print(f"📺 [{timestamp}] {clean_line}")
+                    except:
+                        pass
+                
+                proc.terminate()
+                proc.wait()
+                
+            except Exception as e:
+                print(f"❌ Log streaming error: {e}")
+        
+        def command_processor():
+            """Process commands sent to bot"""
+            while not stop_threads.is_set():
+                try:
+                    if not command_queue.empty():
+                        cmd = command_queue.get_nowait()
+                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        
+                        if cmd == "next":
+                            print(f"⚡ [{timestamp}] Triggering news post...")
+                            # Create signal file for bot to detect and process
+                            signal_command = {
+                                'command': 'post_news',
+                                'timestamp': timestamp,
+                                'source': 'virtual_terminal'
+                            }
+                            
+                            # Send signal file to VM
+                            try:
+                                import tempfile
+                                import json
+                                
+                                # Create local signal file
+                                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                                    json.dump(signal_command, f)
+                                    temp_file = f.name
+                                
+                                # Upload signal file to VM
+                                signal_file = f"{BOT_DIR}/bot_signal.json"
+                                upload_cmd = f"scp -i {SSH_KEY} {temp_file} {VM_USER}@{VM_IP}:{signal_file}"
+                                result = subprocess.run(upload_cmd, shell=True, capture_output=True)
+                                
+                                # Clean up local file
+                                os.unlink(temp_file)
+                                
+                                if result.returncode == 0:
+                                    print(f"📤 [{timestamp}] News trigger sent to bot successfully")
+                                else:
+                                    print(f"❌ [{timestamp}] Failed to send news trigger: {result.stderr.decode()}")
+                            except Exception as e:
+                                print(f"❌ [{timestamp}] Error sending news trigger: {e}")
+                            
+                        elif cmd == "verify":
+                            print(f"🔍 [{timestamp}] Verifying channel access...")
+                            # Create verify signal file
+                            signal_command = {
+                                'command': 'verify_channel',
+                                'timestamp': timestamp,
+                                'source': 'virtual_terminal'
+                            }
+                            
+                            try:
+                                import tempfile
+                                import json
+                                
+                                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                                    json.dump(signal_command, f)
+                                    temp_file = f.name
+                                
+                                signal_file = f"{BOT_DIR}/bot_signal.json"
+                                upload_cmd = f"scp -i {SSH_KEY} {temp_file} {VM_USER}@{VM_IP}:{signal_file}"
+                                result = subprocess.run(upload_cmd, shell=True, capture_output=True)
+                                
+                                os.unlink(temp_file)
+                                
+                                if result.returncode == 0:
+                                    print(f"📤 [{timestamp}] Channel verification request sent")
+                                else:
+                                    print(f"❌ [{timestamp}] Failed to send verification request")
+                            except Exception as e:
+                                print(f"❌ [{timestamp}] Error sending verification request: {e}")
+                        
+                        elif cmd == "status":
+                            print(f"📊 [{timestamp}] Getting bot status...")
+                            stdout, stderr, code = self.run_ssh_command("systemctl is-active telegram-bot.service")
+                            status = stdout.strip() if code == 0 else "inactive"
+                            print(f"📊 [{timestamp}] Bot status: {'🟢 ACTIVE' if status == 'active' else '🔴 INACTIVE'}")
+                            
+                        elif cmd == "restart":
+                            print(f"🔄 [{timestamp}] Restarting bot...")
+                            stdout, stderr, code = self.run_ssh_command("sudo systemctl restart telegram-bot.service")
+                            if code == 0:
+                                print(f"✅ [{timestamp}] Bot restarted successfully")
+                            else:
+                                print(f"❌ [{timestamp}] Restart failed: {stderr}")
+                                
+                        elif cmd == "stop":
+                            print(f"🛑 [{timestamp}] Stopping bot...")
+                            stdout, stderr, code = self.run_ssh_command("sudo systemctl stop telegram-bot.service")
+                            if code == 0:
+                                print(f"✅ [{timestamp}] Bot stopped")
+                            else:
+                                print(f"❌ [{timestamp}] Stop failed: {stderr}")
+                        
+                        command_queue.task_done()
+                        
+                except queue.Empty:
+                    pass
+                except Exception as e:
+                    print(f"❌ Command processor error: {e}")
+                
+                time.sleep(0.1)
+        
+        # Start background threads
+        log_thread = threading.Thread(target=log_streamer, daemon=True)
+        cmd_thread = threading.Thread(target=command_processor, daemon=True)
+        
+        log_thread.start()
+        cmd_thread.start()
+        
+        # Main input loop
+        try:
+            while True:
+                try:
+                    user_input = input().strip()
+                    
+                    if user_input.lower() == 'exit':
+                        print("\n🚪 Exiting virtual terminal...")
+                        print("💡 Bot continues running on VM")
+                        break
+                    
+                    if user_input.lower().startswith('cmd>'):
+                        # Extract command
+                        cmd = user_input[4:].strip().lower()
+                        if cmd in ['next', 'verify', 'status', 'restart', 'stop']:
+                            command_queue.put(cmd)
+                        else:
+                            print(f"❌ Unknown command: {cmd}")
+                            print("🔄 Available: next, verify, status, restart, stop")
+                    
+                    elif user_input.lower() in ['next', 'verify', 'status', 'restart', 'stop']:
+                        # Direct command without CMD> prefix
+                        command_queue.put(user_input.lower())
+                    
+                    elif user_input.lower() == 'help':
+                        print("\n📋 VIRTUAL TERMINAL COMMANDS:")
+                        print("  next      - Trigger news post")
+                        print("  verify    - Check channel access")
+                        print("  status    - Get bot status")
+                        print("  restart   - Restart bot service")
+                        print("  stop      - Stop bot service")
+                        print("  help      - Show this help")
+                        print("  exit      - Leave virtual terminal")
+                        print("💡 Commands can be typed directly or with 'CMD>' prefix\n")
+                    
+                    elif user_input == '':
+                        continue
+                    
+                    else:
+                        print(f"❌ Unknown input: {user_input}")
+                        print("💡 Type 'help' for available commands")
+                
+                except EOFError:
+                    break
+                except KeyboardInterrupt:
+                    print("\n🚪 Exiting virtual terminal...")
+                    break
+                    
+        finally:
+            # Clean shutdown
+            stop_threads.set()
+            time.sleep(0.5)  # Let threads finish
+            print("✅ Virtual terminal session ended")
+
     def show_help(self):
         """Show available commands"""
         print("\n🎮 VM BOT MONITOR COMMANDS")
@@ -146,6 +374,7 @@ class VMMonitor:
         print("logs       - Show recent logs (default 50 lines)")
         print("logs N     - Show recent N lines of logs")
         print("live       - Show live log stream (Ctrl+C to stop)")
+        print("vterminal  - Virtual terminal mode (live logs + interaction)")
         print("stats      - Show bot performance statistics")
         print("start      - Start the bot service")
         print("stop       - Stop the bot service")
@@ -153,7 +382,7 @@ class VMMonitor:
         print("console    - Open remote console (interactive)")
         print("help       - Show this help")
         print("exit       - Exit monitor")
-    
+
     def open_console(self):
         """Open interactive console on VM"""
         print("\n🖥️  Opening VM Console...")
@@ -200,6 +429,8 @@ def main():
             monitor.control_bot(command)
         elif command == "console":
             monitor.open_console()
+        elif command == "vterminal":
+            monitor.virtual_terminal()
         elif command == "help":
             monitor.show_help()
         else:
@@ -231,6 +462,8 @@ def main():
                 monitor.control_bot(command)
             elif command == "console":
                 monitor.open_console()
+            elif command == "vterminal":
+                monitor.virtual_terminal()
             elif command == "help":
                 monitor.show_help()
             elif command == "":

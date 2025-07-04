@@ -1637,6 +1637,17 @@ def main() -> None:
             async def console_monitor():
                 """Monitor console for commands."""
                 global news_task_running
+                
+                # Check if stdin is available (not running as service)
+                if not sys.stdin.isatty():
+                    print("⌨️ Console monitor disabled (running as service)")
+                    print("⌨️ Socket-based remote console enabled on port 8888")
+                    print("🌐 Remote console server started on port 8888")
+                    # Keep the task alive but don't try to read from stdin
+                    while news_task_running:
+                        await asyncio.sleep(1)
+                    return
+                
                 print("⌨️ Console monitor started. Type commands:")
                 import sys
                 from concurrent.futures import ThreadPoolExecutor
@@ -1674,12 +1685,57 @@ def main() -> None:
                         print(f"❌ Console monitor error: {e}")
                         await asyncio.sleep(0.1)
             
+            async def signal_monitor():
+                """Monitor for signal files from virtual terminal."""
+                signal_file = "bot_signal.json"
+                print("📡 Signal monitor started (checking for virtual terminal commands)")
+                
+                while news_task_running:
+                    try:
+                        if os.path.exists(signal_file):
+                            # Read and process signal file
+                            with open(signal_file, 'r') as f:
+                                signal_data = json.load(f)
+                            
+                            command = signal_data.get('command')
+                            timestamp = signal_data.get('timestamp', 'unknown')
+                            source = signal_data.get('source', 'unknown')
+                            
+                            print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Signal received: {command} from {source}")
+                            
+                            if command == 'post_news':
+                                print(f"⚡ Processing manual news trigger from virtual terminal...")
+                                await post_to_channel()
+                            elif command == 'verify_channel':
+                                print(f"🔍 Processing channel verification request...")
+                                await verify_channel_access()
+                            else:
+                                print(f"❌ Unknown signal command: {command}")
+                            
+                            # Remove signal file after processing
+                            os.remove(signal_file)
+                            print(f"🧹 Signal file processed and removed")
+                        
+                        # Check every 5 seconds
+                        await asyncio.sleep(5)
+                        
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Invalid signal file format: {e}")
+                        # Remove corrupted file
+                        if os.path.exists(signal_file):
+                            os.remove(signal_file)
+                    except Exception as e:
+                        print(f"❌ Signal monitor error: {e}")
+                        await asyncio.sleep(5)
+            
             # Create background tasks
             news_task = asyncio.create_task(news_scheduler())
             console_task = asyncio.create_task(console_monitor())
+            signal_task = asyncio.create_task(signal_monitor())
             
             print("📅 News scheduler started")
             print("⌨️ Console monitor started")
+            print("📡 Signal monitor started")
             print("✅ Bot ready!")
             print("⌨️ Console commands: next, verify, stop, help")
             print("-" * 50)
@@ -1705,9 +1761,10 @@ def main() -> None:
                 news_task_running = False
                 news_task.cancel()
                 console_task.cancel()
+                signal_task.cancel()
                 
                 try:
-                    await asyncio.gather(news_task, console_task, return_exceptions=True)
+                    await asyncio.gather(news_task, console_task, signal_task, return_exceptions=True)
                 except:
                     pass
                 
