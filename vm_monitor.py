@@ -153,6 +153,10 @@ class VMMonitor:
         print("💡 Bot continues running when you disconnect")
         print("=" * 60)
         
+        # Queue for commands
+        command_queue = queue.Queue()
+        stop_threads = threading.Event()
+        
         def log_streamer():
             """Stream logs in real-time"""
             try:
