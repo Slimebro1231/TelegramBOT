@@ -8,8 +8,12 @@ import subprocess
 import sys
 import os
 import json
-from datetime import datetime
+import tempfile
+import threading
+import queue
+import select
 import time
+from datetime import datetime
 
 # VM Configuration
 VM_IP = "157.10.162.223"
@@ -148,15 +152,6 @@ class VMMonitor:
         print("❌ Type 'exit' to leave virtual terminal")
         print("💡 Bot continues running when you disconnect")
         print("=" * 60)
-        
-        import threading
-        import queue
-        import select
-        import sys
-        
-        # Queue for commands
-        command_queue = queue.Queue()
-        stop_threads = threading.Event()
         
         def log_streamer():
             """Stream logs in real-time"""

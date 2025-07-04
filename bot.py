@@ -11,7 +11,6 @@ Telegram AI Bot with Bitdeer DeepSeek-R1 API Integration
 
 import os
 import asyncio
-# import ollama  # Removed - API-only mode
 import threading
 import json
 import re
@@ -42,7 +41,6 @@ TOKEN = os.getenv("BOT_TOKEN")
 if TOKEN is None:
     raise RuntimeError("⛔  BOT_TOKEN not set in environment variables or .env file")
 
-MODEL_NAME = "r1-assistant"  # Name we'll give our model in Ollama
 MAX_MESSAGE_LENGTH = 4000  # Telegram limit is 4096, leave some buffer
 CHANNEL_ID = "@Matrixdock_News"  # Channel to post automatic news
 NEWS_INTERVAL = 1800  # 30 minutes between posts (in seconds)
@@ -1485,28 +1483,7 @@ Specific actions for Matrixdock's BD team:"""
 
 # handle_message function removed - bot now only responds to commands (/)
 
-async def debug_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Debug function to log all messages the bot receives."""
-    try:
-        if update.message:
-            message_info = {
-                'chat_type': update.effective_chat.type,
-                'chat_title': update.effective_chat.title,
-                'chat_id': update.effective_chat.id,
-                'user_id': update.effective_user.id if update.effective_user else None,
-                'username': update.effective_user.username if update.effective_user else None,
-                'message_text': update.message.text[:50] if update.message.text else None,
-                'is_reply': bool(update.message.reply_to_message),
-                'from_user': str(update.message.from_user) if update.message.from_user else "No user",
-                'message_id': update.message.message_id
-            }
-            
-            print(f"📨 Message Debug: {message_info}")
-        
-        # Don't respond to avoid spam, just log
-        
-    except Exception as e:
-        print(f"❌ Debug message error: {e}")
+
 
 async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Special handler for /bd commands in the specific channel."""
@@ -1576,11 +1553,6 @@ def main() -> None:
     
     # Commands only - no text message handler (users must use /commands)
     
-    # Add specific handler for channel messages (more permissive)
-    application.add_handler(
-        MessageHandler(filters.ALL, debug_all_messages)
-    )
-    
     # Special handler for channel posts (bypass normal user restrictions)
     application.add_handler(
         MessageHandler(
@@ -1641,8 +1613,7 @@ def main() -> None:
                 # Check if stdin is available (not running as service)
                 if not sys.stdin.isatty():
                     print("⌨️ Console monitor disabled (running as service)")
-                    print("⌨️ Socket-based remote console enabled on port 8888")
-                    print("🌐 Remote console server started on port 8888")
+                    print("📡 Signal monitor active for virtual terminal commands")
                     # Keep the task alive but don't try to read from stdin
                     while news_task_running:
                         await asyncio.sleep(1)
