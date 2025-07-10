@@ -1305,18 +1305,53 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     log_thinking_step("BD Reply Analysis", f"Analyzing news for Matrixdock angles: {news_content[:100]}...")
     
-    bd_prompt = f"""Based on this news, what specific business actions should Matrixdock (tokenized treasury platform) take? Focus on realistic, actionable steps:
+    bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
+1. XAUm – tokenized gold
+2. STBT – tokenized T-bills
+3. Advisory & infra – tokenization advisory or technical integration services
 
-- Mid-tier companies/platforms to contact (not Fortune 500 CEOs)
-- Partnership proposals that match Matrixdock's scale
-- Specific outreach actions the BD team can take this week
-- Services/solutions to pitch that align with the news
+Format your output as follows:
+1. BD Angles (max 3 bullets)
+Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-Format as bullet points with concrete next steps, not aspirational goals.
+2. Matrixdock Synergy Score
+Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
+Scoring Dimensions (3):
+1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
+2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
+3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
+Score Definitions
+10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
+7 = 2 of 3 dimensions, high potential but may lack one area
+5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
+3 = Speculative or adjacent
+1 = no clear synergy
+Asset-Specific Rules:
+XAUm (Gold Token):
+High score only if the news involves:
+• Physical gold demand / redemption
+• Asset-backed payments
+• Precious metals in structured products
+• Emerging market gold allocation or reserves
 
-News: {news_content}
+STBT (T-Bill Token):
+High score if related to:
+• Tokenized MMFs, cash management, DeFi yield products
+• Institutional liquidity products
+• Risk-free rate exposure on-chain
+• Stablecoin reserve composition
 
-Realistic actions for Matrixdock's BD team:"""
+Advisory & Infra:
+High score if:
+• Project involves asset tokenization of any real-world asset (RWA)
+• There's a blockchain/infra angle (vaults, custody, smart contracts)
+• Matrixdock could provide compliance or distribution support
+
+3. Contact to Explore
+Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
+
+News: {news_content}"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_reply")
     
@@ -1352,18 +1387,53 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
         analysis_content = content_input
         content_display = content_input
     
-    bd_prompt = f"""Based on this content, what specific business actions should Matrixdock (tokenized treasury platform) take? Focus on realistic, actionable steps:
+    bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
+1. XAUm – tokenized gold
+2. STBT – tokenized T-bills
+3. Advisory & infra – tokenization advisory or technical integration services
 
-- Mid-tier companies/platforms to contact (not Fortune 500 CEOs)
-- Partnership proposals that match Matrixdock's scale  
-- Specific outreach actions the BD team can take this week
-- Services/solutions to pitch that align with the content
+Format your output as follows:
+1. BD Angles (max 3 bullets)
+Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-Format as bullet points with concrete next steps, not aspirational goals.
+2. Matrixdock Synergy Score
+Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
+Scoring Dimensions (3):
+1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
+2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
+3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
+Score Definitions
+10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
+7 = 2 of 3 dimensions, high potential but may lack one area
+5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
+3 = Speculative or adjacent
+1 = no clear synergy
+Asset-Specific Rules:
+XAUm (Gold Token):
+High score only if the news involves:
+• Physical gold demand / redemption
+• Asset-backed payments
+• Precious metals in structured products
+• Emerging market gold allocation or reserves
 
-Content: {analysis_content}
+STBT (T-Bill Token):
+High score if related to:
+• Tokenized MMFs, cash management, DeFi yield products
+• Institutional liquidity products
+• Risk-free rate exposure on-chain
+• Stablecoin reserve composition
 
-Realistic actions for Matrixdock's BD team:"""
+Advisory & Infra:
+High score if:
+• Project involves asset tokenization of any real-world asset (RWA)
+• There's a blockchain/infra angle (vaults, custody, smart contracts)
+• Matrixdock could provide compliance or distribution support
+
+3. Contact to Explore
+Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
+
+Content: {analysis_content}"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
@@ -1460,17 +1530,53 @@ Published: January 15, 2025 at 02:30 PM EST"""
     status_msg = await update.message.reply_text("🧪 Testing BD analysis with sample news...")
     
     # Simulate the BD analysis
-    bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
-- Companies to contact (CEO/CTO/CFO names if mentioned) 
-- Partnerships to propose
-- Meetings to schedule
-- Services to pitch
+    bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
+1. XAUm – tokenized gold
+2. STBT – tokenized T-bills
+3. Advisory & infra – tokenization advisory or technical integration services
 
-Don't give market analysis - give specific business actions.
+Format your output as follows:
+1. BD Angles (max 3 bullets)
+Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-News: {fake_news}
+2. Matrixdock Synergy Score
+Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
+Scoring Dimensions (3):
+1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
+2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
+3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
+Score Definitions
+10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
+7 = 2 of 3 dimensions, high potential but may lack one area
+5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
+3 = Speculative or adjacent
+1 = no clear synergy
+Asset-Specific Rules:
+XAUm (Gold Token):
+High score only if the news involves:
+• Physical gold demand / redemption
+• Asset-backed payments
+• Precious metals in structured products
+• Emerging market gold allocation or reserves
 
-Specific actions for Matrixdock's BD team:"""
+STBT (T-Bill Token):
+High score if related to:
+• Tokenized MMFs, cash management, DeFi yield products
+• Institutional liquidity products
+• Risk-free rate exposure on-chain
+• Stablecoin reserve composition
+
+Advisory & Infra:
+High score if:
+• Project involves asset tokenization of any real-world asset (RWA)
+• There's a blockchain/infra angle (vaults, custody, smart contracts)
+• Matrixdock could provide compliance or distribution support
+
+3. Contact to Explore
+Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
+
+News: {fake_news}"""
 
     ai_response = await get_ai_response(bd_prompt, command="test_bd")
     
@@ -1521,17 +1627,53 @@ async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAUL
             # Perform BD analysis on the replied message
             status_msg = await update.message.reply_text("🤝 Analyzing BD opportunities in this news...")
             
-            bd_prompt = f"""What specific business actions should Matrixdock take based on this news? Focus on:
-- Companies to contact (CEO/CTO/CFO names if mentioned) 
-- Partnerships to propose
-- Meetings to schedule
-- Services to pitch
+            bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
+1. XAUm – tokenized gold
+2. STBT – tokenized T-bills
+3. Advisory & infra – tokenization advisory or technical integration services
 
-Don't give market analysis - give specific business actions.
+Format your output as follows:
+1. BD Angles (max 3 bullets)
+Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-News: {replied_text}
+2. Matrixdock Synergy Score
+Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
+Scoring Dimensions (3):
+1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
+2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
+3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
+Score Definitions
+10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
+7 = 2 of 3 dimensions, high potential but may lack one area
+5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
+3 = Speculative or adjacent
+1 = no clear synergy
+Asset-Specific Rules:
+XAUm (Gold Token):
+High score only if the news involves:
+• Physical gold demand / redemption
+• Asset-backed payments
+• Precious metals in structured products
+• Emerging market gold allocation or reserves
 
-Specific actions for Matrixdock's BD team:"""
+STBT (T-Bill Token):
+High score if related to:
+• Tokenized MMFs, cash management, DeFi yield products
+• Institutional liquidity products
+• Risk-free rate exposure on-chain
+• Stablecoin reserve composition
+
+Advisory & Infra:
+High score if:
+• Project involves asset tokenization of any real-world asset (RWA)
+• There's a blockchain/infra angle (vaults, custody, smart contracts)
+• Matrixdock could provide compliance or distribution support
+
+3. Contact to Explore
+Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
+
+News: {replied_text}"""
 
             ai_response = await get_ai_response(bd_prompt, command="channel_bd")
             
