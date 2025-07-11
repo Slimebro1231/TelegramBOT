@@ -1277,7 +1277,7 @@ async def bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         response = f"🤝 **Matrixdock Partnership Analysis**\n\n{ai_response}"
         log_thinking_step("BD Analysis Complete", f"Generated {len(response)} char analysis")
     else:
-        response = "🤝 **Matrixdock Partnership Analysis**\n\n• TradFi institutions seeking RWA tokenization solutions create strategic partnership opportunities\n• Cross-border payment networks offer distribution channel expansion possibilities\n• Custody and compliance providers enable institutional market access\n• Technology partnerships with blockchain infrastructure enhance platform capabilities"
+        response = "🤝 **Matrixdock Partnership Analysis**\n\nMatrixdock can partner on these three angles\nAngle 1: TradFi institutions seeking RWA tokenization solutions create strategic partnership opportunities\nAngle 2: Cross-border payment networks offer distribution channel expansion possibilities\nAngle 3: Custody and compliance providers enable institutional market access\nThis is a general 6/10 opportunity for Advisory & infra.\nBroad market opportunity with multiple potential integration points\nStrong alignment with Matrixdock's core competencies in RWA tokenization\nRequires specific opportunity identification and targeted outreach\nI suggest you reach out to\nNo specific contact available - use general market research."
         log_thinking_step("BD Fallback", "Using fallback analysis due to AI unavailability")
     
     await status_msg.edit_text(response)
@@ -1309,21 +1309,33 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 3. Advisory & infra – tokenization advisory or technical integration services
 
 Format your output as follows:
-1. BD Angles (max 3 bullets)
+Matrixdock can partner on these three angles
+Angle 1:
+Angle 2:
+Angle 3:
+This news is a X/10 opportunity for [most relevant product].
+Reason 1
+Reason 2
+Reason 3
+I suggest you reach out to
+Name
+Title
+LinkedIn / email
+
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-2. Matrixdock Synergy Score
-Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
 Scoring Dimensions (3):
 1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
 2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
 3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
-Score Definitions
+
+Score Definitions:
 10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
 7 = 2 of 3 dimensions, high potential but may lack one area
 5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
 3 = Speculative or adjacent
 1 = no clear synergy
+
 Asset-Specific Rules:
 XAUm (Gold Token):
 High score only if the news involves:
@@ -1345,8 +1357,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-3. Contact to Explore
-Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+If unknown contact, say "No contact found." (One-person only)
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {news_content}"""
@@ -1357,7 +1368,7 @@ News: {news_content}"""
         response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n{ai_response}"
         log_thinking_step("BD Reply Complete", f"Generated BD analysis for news content")
     else:
-        response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved in this announcement\n• Business development follow-up on regulatory or technology developments\n• Market positioning advantage through early engagement with emerging trends"
+        response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
         log_thinking_step("BD Reply Fallback", "Using fallback BD analysis")
     
     await status_msg.edit_text(response)
@@ -1391,21 +1402,33 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
 3. Advisory & infra – tokenization advisory or technical integration services
 
 Format your output as follows:
-1. BD Angles (max 3 bullets)
+Matrixdock can partner on these three angles
+Angle 1:
+Angle 2:
+Angle 3:
+This news is a X/10 opportunity for [most relevant product].
+Reason 1
+Reason 2
+Reason 3
+I suggest you reach out to
+Name
+Title
+LinkedIn / email
+
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-2. Matrixdock Synergy Score
-Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
 Scoring Dimensions (3):
 1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
 2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
 3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
-Score Definitions
+
+Score Definitions:
 10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
 7 = 2 of 3 dimensions, high potential but may lack one area
 5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
 3 = Speculative or adjacent
 1 = no clear synergy
+
 Asset-Specific Rules:
 XAUm (Gold Token):
 High score only if the news involves:
@@ -1427,8 +1450,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-3. Contact to Explore
-Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+If unknown contact, say "No contact found." (One-person only)
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 Content: {analysis_content}"""
@@ -1439,7 +1461,7 @@ Content: {analysis_content}"""
         response = f"🤝 **Matrixdock BD Opportunities**\n\n📄 *Analyzing:* {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\n{ai_response}"
         log_thinking_step("BD Content Complete", f"Generated BD analysis for provided content")
     else:
-        response = f"🤝 **Matrixdock BD Opportunities**\n\n📄 *Analyzing:* {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved\n• Business development follow-up on emerging opportunities\n• Market positioning advantage through early engagement"
+        response = f"🤝 **Matrixdock BD Opportunities**\n\n📄 *Analyzing:* {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this development\nAngle 2: Business development follow-up on emerging opportunities\nAngle 3: Market positioning advantage through early engagement\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for strategic partnerships\nGeneral market opportunity that could align with Matrixdock's capabilities\nRequires deeper analysis to identify specific integration points\nI suggest you reach out to\nNo contact found."
         log_thinking_step("BD Content Fallback", "Using fallback BD analysis")
     
     await status_msg.edit_text(response)
@@ -1534,21 +1556,33 @@ Published: January 15, 2025 at 02:30 PM EST"""
 3. Advisory & infra – tokenization advisory or technical integration services
 
 Format your output as follows:
-1. BD Angles (max 3 bullets)
+Matrixdock can partner on these three angles
+Angle 1:
+Angle 2:
+Angle 3:
+This news is a X/10 opportunity for [most relevant product].
+Reason 1
+Reason 2
+Reason 3
+I suggest you reach out to
+Name
+Title
+LinkedIn / email
+
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-2. Matrixdock Synergy Score
-Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
 Scoring Dimensions (3):
 1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
 2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
 3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
-Score Definitions
+
+Score Definitions:
 10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
 7 = 2 of 3 dimensions, high potential but may lack one area
 5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
 3 = Speculative or adjacent
 1 = no clear synergy
+
 Asset-Specific Rules:
 XAUm (Gold Token):
 High score only if the news involves:
@@ -1570,8 +1604,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-3. Contact to Explore
-Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+If unknown contact, say "No contact found." (One-person only)
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {fake_news}"""
@@ -1582,7 +1615,7 @@ News: {fake_news}"""
         response = f"🧪 **Test BD Analysis**\n\n📰 *Sample News:* BlackRock launches tokenized gold fund...\n\n{ai_response}"
         log_thinking_step("Test BD Complete", f"Generated test BD analysis")
     else:
-        response = f"🧪 **Test BD Analysis**\n\n📰 *Sample News:* BlackRock launches tokenized gold fund...\n\n• Partnership opportunity with State Street for custody integration solutions\n• Strategic outreach to BlackRock's digital assets team for platform collaboration\n• Business development follow-up on tokenized gold infrastructure partnerships\n• Market positioning advantage as established gold tokenization platform"
+        response = f"🧪 **Test BD Analysis**\n\n📰 *Sample News:* BlackRock launches tokenized gold fund...\n\nMatrixdock can partner on these three angles\nAngle 1: Partnership opportunity with State Street for custody integration solutions\nAngle 2: Strategic outreach to BlackRock's digital assets team for platform collaboration\nAngle 3: Business development follow-up on tokenized gold infrastructure partnerships\nThis news is a 8/10 opportunity for XAUm.\nDirect product fit with institutional tokenized gold demand\nHigh TVL potential through BlackRock's institutional client base\nSignificant brand lift through association with leading asset manager\nI suggest you reach out to\nRobbie Mitchnick\nHead of Digital Assets, BlackRock\nLinkedin.com/in/robbiemitchnick"
         log_thinking_step("Test BD Fallback", "Using fallback test BD analysis")
     
     await status_msg.edit_text(response)
@@ -1610,21 +1643,33 @@ async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAUL
 3. Advisory & infra – tokenization advisory or technical integration services
 
 Format your output as follows:
-1. BD Angles (max 3 bullets)
+Matrixdock can partner on these three angles
+Angle 1:
+Angle 2:
+Angle 3:
+This news is a X/10 opportunity for [most relevant product].
+Reason 1
+Reason 2
+Reason 3
+I suggest you reach out to
+Name
+Title
+LinkedIn / email
+
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
-2. Matrixdock Synergy Score
-Rate relevance for each product (out of 10) with a 2-line explanation per product. Assess relevance based on the framework below
 Scoring Dimensions (3):
 1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
 2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
 3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
-Score Definitions
+
+Score Definitions:
 10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
 7 = 2 of 3 dimensions, high potential but may lack one area
 5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
 3 = Speculative or adjacent
 1 = no clear synergy
+
 Asset-Specific Rules:
 XAUm (Gold Token):
 High score only if the news involves:
@@ -1646,8 +1691,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-3. Contact to Explore
-Give the most relevant BD-facing contact (Name, Title, LinkedIn/email). If unknown, say "No contact found."
+If unknown contact, say "No contact found." (One-person only)
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {replied_text}"""
@@ -1657,7 +1701,7 @@ News: {replied_text}"""
             if ai_response:
                 response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\n{ai_response}"
             else:
-                response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved in this announcement\n• Business development follow-up on regulatory or technology developments\n• Market positioning advantage through early engagement with emerging trends"
+                response = f"🤝 **Matrixdock BD Opportunities**\n\n📰 *Analyzing:* {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
             
             await status_msg.edit_text(response)
         else:
