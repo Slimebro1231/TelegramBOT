@@ -295,6 +295,22 @@ class NewsScraper:
         """Calculate relevance score based on keywords."""
         text = f"{article['title']} {article['summary']}".lower()
         
+        # Filter out price prediction articles
+        price_prediction_keywords = [
+            'price prediction', 'price forecast', 'price target',
+            'price analysis', 'technical analysis', 'price outlook',
+            'will reach', 'could hit', 'price could', 'price may',
+            'price estimate', 'price projection', 'price expectations',
+            'bullish target', 'bearish target', 'resistance level',
+            'support level', 'fibonacci', 'moving average', 'rsi',
+            'chart analysis', 'trading signals', 'buy signal', 'sell signal'
+        ]
+        
+        # Check if article is a price prediction article
+        for keyword in price_prediction_keywords:
+            if keyword in text:
+                return 0.0  # Zero score for price prediction articles
+        
         total_score = 0.0
         category_matches = {}
         

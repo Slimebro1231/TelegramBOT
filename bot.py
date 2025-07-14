@@ -145,6 +145,7 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                 """Check if text contains AI thinking process indicators."""
                 text_lower = text.lower()
                 thinking_indicators = [
+                    # Direct thinking patterns
                     'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
                     'analyzing', 'considering', 'let me', 'i should', 'the article details',
                     'for the first point', 'for the second', 'for the third', 'each bullet point',
@@ -155,9 +156,65 @@ async def get_ai_response(prompt: str, context: str = "", command: str = "chat")
                     'i consider', 'the first angle', 'the second angle', 'the third angle',
                     'first, i', 'second, i', 'third, i', 'i\'ll focus on', 'i\'ll identify',
                     'next, investor impact', 'if tokenized stocks face', 'traditional retail investors might',
-                    'here are concrete', 'here are specific', 'leveraging the regulatory'
+                    'here are concrete', 'here are specific', 'leveraging the regulatory',
+                    
+                    # Meta-commentary about users (key problem patterns from user examples)
+                    'the user is likely', 'the user might be', 'users are probably',
+                    'investors seeking', 'analysts looking for', 'likely an investor',
+                    'seeking quick insights', 'without fluff', 'their deeper need',
+                    'the audience wants', 'readers are interested', 'people want to know',
+                    'this addresses the', 'this captures how', 'this explains why',
+                    
+                    # Incomplete/cut-off thoughts (from user examples)
+                    'this could undermine trust in', 'that might lead to increased',
+                    'since the case involves', 'as inves', 'investment d', 'affect market stability or',
+                    'legal uncertainties affect', 'volatility in crypto markets as',
+                    
+                    # Analysis meta-commentary (from user examples)
+                    'the bot\'s thinking', 'thinking process', 'process gets taken',
+                    'word scraping', 'content we want', 'reliably get',
+                    'several times', 'taken as the content',
+                    
+                    # Task-related thinking (from user examples)
+                    'that\'s about', 'words—good', 'words good', 'captures', 'addresses',
+                    'signal evolving', 'developments signal',
+                    
+                    # Generic analysis patterns
+                    'this shows that', 'this means that', 'this indicates',
+                    'based on this', 'therefore', 'consequently',
+                    'in conclusion', 'to summarize', 'overall'
                 ]
-                return any(indicator in text_lower for indicator in thinking_indicators)
+                
+                # Check direct indicators
+                if any(indicator in text_lower for indicator in thinking_indicators):
+                    return True
+                
+                # Check for incomplete sentences ending with problematic patterns
+                text_stripped = text.strip()
+                incomplete_endings = ['as inves', 'investment d', ' or', ' and', ' but', ' since', ' because']
+                if any(text_stripped.lower().endswith(ending) for ending in incomplete_endings):
+                    return True
+                
+                # Check for word count references
+                if re.search(r'\b\d+\s*words?\b', text_lower):
+                    return True
+                
+                # Check for ellipsis or em dash (incomplete thoughts)
+                if '...' in text or '—' in text:
+                    return True
+                
+                # Check for meta-commentary patterns with regex
+                meta_patterns = [
+                    r'.*\b(user|users|audience|readers)\s+(want|wants|need|needs|seek|seeks|are|is)\b.*',
+                    r'.*\b(likely|probably|might be|could be)\s+(an investor|analyst|interested)\b.*',
+                    r'.*\b(bot\'s|thinking|process|scraping)\b.*'
+                ]
+                
+                for pattern in meta_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        return True
+                
+                return False
             
             # First, try to remove <think>...</think> blocks (common in R1 models)
             think_pattern = r'<think>.*?</think>'
@@ -633,14 +690,71 @@ def validate_and_improve_bullets(bullet_points: list, headline: str) -> list:
         """Check if text contains AI thinking process indicators."""
         text_lower = text.lower()
         thinking_indicators = [
+            # Direct thinking patterns
             'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
             'analyzing', 'considering', 'let me', 'i should', 'the article details',
             'for the first point', 'for the second', 'for the third', 'each bullet point',
             'between 10-15 words', 'about market impact', 'i\'ll need to create',
             'with a relevance score', 'the summary mentions', 'published on',
-            'the user wants me to', 'i\'ll need to', 'bullet points about'
+            'the user wants me to', 'i\'ll need to', 'bullet points about',
+            
+            # Meta-commentary about users (key problem patterns from user examples)
+            'the user is likely', 'the user might be', 'users are probably',
+            'investors seeking', 'analysts looking for', 'likely an investor',
+            'seeking quick insights', 'without fluff', 'their deeper need',
+            'the audience wants', 'readers are interested', 'people want to know',
+            'this addresses the', 'this captures how', 'this explains why',
+            
+            # Incomplete/cut-off thoughts (from user examples)
+            'this could undermine trust in', 'that might lead to increased',
+            'since the case involves', 'as inves', 'investment d', 'affect market stability or',
+            'legal uncertainties affect', 'volatility in crypto markets as',
+            
+            # Analysis meta-commentary (from user examples)
+            'the bot\'s thinking', 'thinking process', 'process gets taken',
+            'word scraping', 'content we want', 'reliably get',
+            'several times', 'taken as the content',
+            
+            # Task-related thinking (from user examples)
+            'that\'s about', 'words—good', 'words good', 'captures', 'addresses',
+            'signal evolving', 'developments signal',
+            
+            # Generic analysis patterns
+            'this shows that', 'this means that', 'this indicates',
+            'based on this', 'therefore', 'consequently',
+            'in conclusion', 'to summarize', 'overall'
         ]
-        return any(indicator in text_lower for indicator in thinking_indicators)
+        
+        # Check direct indicators
+        if any(indicator in text_lower for indicator in thinking_indicators):
+            return True
+        
+        # Check for incomplete sentences ending with problematic patterns
+        text_stripped = text.strip()
+        incomplete_endings = ['as inves', 'investment d', ' or', ' and', ' but', ' since', ' because']
+        if any(text_stripped.lower().endswith(ending) for ending in incomplete_endings):
+            return True
+        
+        # Check for word count references
+        if re.search(r'\b\d+\s*words?\b', text_lower):
+            return True
+        
+        # Check for ellipsis or em dash (incomplete thoughts)
+        if '...' in text or '—' in text:
+            return True
+        
+        # Check for meta-commentary patterns with regex
+        meta_patterns = [
+            r'.*\b(user|users|audience|readers)\s+(want|wants|need|needs|seek|seeks|are|is)\b.*',
+            r'.*\b(likely|probably|might be|could be)\s+(an investor|analyst|interested)\b.*',
+            r'.*\b(bot\'s|thinking|process|scraping)\b.*'
+        ]
+        
+        for pattern in meta_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        
+        return False
     
     def clean_bullet(bullet: str) -> str:
         """Clean and standardize bullet point format."""
@@ -885,11 +999,33 @@ Provide 3 direct market impact bullets:"""
                     
                     # Enhanced thinking detection patterns
                     thinking_indicators = [
+                        # Direct thinking patterns
                         'hmm,', 'the user wants', 'i need to', 'i think', 'i\'ll', 'looking at',
                         'analyzing', 'considering', 'let me', 'i should', 'the article details',
                         'for the first point', 'for the second', 'for the third', 'each bullet point',
                         'between 10-15 words', 'about market impact', 'i\'ll need to create',
-                        'with a relevance score', 'the summary mentions', 'published on'
+                        'with a relevance score', 'the summary mentions', 'published on',
+                        
+                        # Meta-commentary about users (key problem patterns from user examples)
+                        'the user is likely', 'the user might be', 'users are probably',
+                        'investors seeking', 'analysts looking for', 'likely an investor',
+                        'seeking quick insights', 'without fluff', 'their deeper need',
+                        'the audience wants', 'readers are interested', 'people want to know',
+                        'this addresses the', 'this captures how', 'this explains why',
+                        
+                        # Incomplete/cut-off thoughts (from user examples)
+                        'this could undermine trust in', 'that might lead to increased',
+                        'since the case involves', 'as inves', 'investment d', 'affect market stability or',
+                        'legal uncertainties affect', 'volatility in crypto markets as',
+                        
+                        # Analysis meta-commentary (from user examples)
+                        'the bot\'s thinking', 'thinking process', 'process gets taken',
+                        'word scraping', 'content we want', 'reliably get',
+                        'several times', 'taken as the content',
+                        
+                        # Task-related thinking (from user examples)
+                        'that\'s about', 'words—good', 'words good', 'captures', 'addresses',
+                        'signal evolving', 'developments signal'
                     ]
                     
                     for line in lines:
