@@ -416,55 +416,24 @@ def format_bd_response_for_mobile(ai_response: str) -> str:
     if not ai_response:
         return ai_response
     
-    # Remove markdown formatting that doesn't work well on mobile
+    # The response should already be formatted properly from the prompt
+    # Just do minimal cleanup
     formatted = ai_response
     
-    # Replace markdown headers with emoji + text
-    formatted = formatted.replace("### BD Angles", "🎯 BD ANGLES")
-    formatted = formatted.replace("### Matrixdock Synergy Score", "📊 SYNERGY SCORE")
-    formatted = formatted.replace("### Contact to Explore", "📞 CONTACT TO EXPLORE")
-    
-    # Remove markdown bold/italic formatting
+    # Remove any accidental markdown that might have slipped through
     formatted = formatted.replace("**", "")
     formatted = formatted.replace("*", "")
+    formatted = formatted.replace("###", "")
+    formatted = formatted.replace("##", "")
     
-    # Replace markdown tables with mobile-friendly format
-    if "| Product" in formatted and "| Score" in formatted:
-        # Find the table section
-        lines = formatted.split('\n')
-        new_lines = []
-        in_table = False
-        table_data = []
-        
-        for line in lines:
-            if "| Product" in line and "| Score" in line:
-                in_table = True
-                new_lines.append("📊 SYNERGY SCORE")
-                new_lines.append("")
-                continue
-            elif in_table and line.strip().startswith("|"):
-                # Parse table row
-                parts = [p.strip() for p in line.split("|") if p.strip()]
-                if len(parts) >= 3:
-                    product = parts[0]
-                    score = parts[1]
-                    explanation = parts[2]
-                    table_data.append((product, score, explanation))
-            elif in_table and not line.strip().startswith("|"):
-                # End of table, format the data
-                for product, score, explanation in table_data:
-                    new_lines.append(f"🔸 {product}: {score}")
-                    new_lines.append(f"   {explanation}")
-                    new_lines.append("")
-                in_table = False
-                new_lines.append(line)
-            else:
-                new_lines.append(line)
-        
-        formatted = '\n'.join(new_lines)
+    # Ensure consistent spacing around section separators
+    formatted = formatted.replace("\n---\n", "\n\n---\n\n")
+    formatted = formatted.replace("\n---", "\n\n---")
+    formatted = formatted.replace("---\n", "---\n\n")
     
-    # Add spacing for better mobile readability
-    formatted = formatted.replace("\n\n", "\n\n\n")
+    # Remove any markdown links and just keep the URL
+    import re
+    formatted = re.sub(r'\[([^\]]+)\]\(([^\)]+)\)', r'\2', formatted)
     
     return formatted
 
@@ -1499,16 +1468,50 @@ async def bd_reply_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 2. STBT – tokenized T-bills
 3. Advisory & infra – tokenization advisory or technical integration services
 
-Format your output as follows:
-Matrixdock can partner on these three angles
-Angle 1:
-Angle 2:
-Angle 3:
+Format your output EXACTLY as follows (no markdown, single lines per point):
+
+• This move [single line context about the news]
+
+---
+
+Matrixdock Partnership Angles
+
+Angle 1 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 2 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 3 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+
+---
+
+Opportunity Score
+
 This news is a X/10 opportunity for [most relevant product].
-I suggest you reach out to
-Name
-Title
-LinkedIn / email
+TVL Potential: [Low/Medium/High] ([one line reason]).
+Direct Fit: [Low/Medium/High] for [product] ([one line reason]).
+Strategic Lift: [Low/Medium/High] ([one line reason]).
+
+---
+
+Suggested Outreach
+
+For [Company/Initiative]:
+Name: [Full Name]
+Title: [Job Title]
+LinkedIn: [profile URL without markdown]
+Focus: [Single line describing the outreach angle]
+
+FORMATTING RULES:
+- NO markdown formatting (no **, no ### headers, no []() links)
+- Each point must be a SINGLE line
+- Use --- to separate sections
+- For angles, label each as (STBT Distribution), (Advisory & Infra), or (XAUm Reserve)
+- Keep all descriptions concise and on one line
 
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
@@ -1545,7 +1548,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-If unknown contact, say "No contact found." (One-person only)
+If unknown contact, say "No contact found."
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {news_content}"""
@@ -1591,19 +1594,50 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
 2. STBT – tokenized T-bills
 3. Advisory & infra – tokenization advisory or technical integration services
 
-Format your output as follows:
-Matrixdock can partner on these three angles
-Angle 1:
-Angle 2:
-Angle 3:
+Format your output EXACTLY as follows (no markdown, single lines per point):
+
+• This move [single line context about the news]
+
+---
+
+Matrixdock Partnership Angles
+
+Angle 1 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 2 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 3 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+
+---
+
+Opportunity Score
+
 This news is a X/10 opportunity for [most relevant product].
-Reason 1
-Reason 2
-Reason 3
-I suggest you reach out to
-Name
-Title
-LinkedIn / email
+TVL Potential: [Low/Medium/High] ([one line reason]).
+Direct Fit: [Low/Medium/High] for [product] ([one line reason]).
+Strategic Lift: [Low/Medium/High] ([one line reason]).
+
+---
+
+Suggested Outreach
+
+For [Company/Initiative]:
+Name: [Full Name]
+Title: [Job Title]
+LinkedIn: [profile URL without markdown]
+Focus: [Single line describing the outreach angle]
+
+FORMATTING RULES:
+- NO markdown formatting (no **, no ### headers, no []() links)
+- Each point must be a SINGLE line
+- Use --- to separate sections
+- For angles, label each as (STBT Distribution), (Advisory & Infra), or (XAUm Reserve)
+- Keep all descriptions concise and on one line
 
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
@@ -1640,10 +1674,10 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-If unknown contact, say "No contact found." (One-person only)
+If unknown contact, say "No contact found."
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
-Content: {analysis_content}"""
+News: {analysis_content}"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
@@ -1747,19 +1781,50 @@ Published: January 15, 2025 at 02:30 PM EST"""
 2. STBT – tokenized T-bills
 3. Advisory & infra – tokenization advisory or technical integration services
 
-Format your output as follows:
-Matrixdock can partner on these three angles
-Angle 1:
-Angle 2:
-Angle 3:
+Format your output EXACTLY as follows (no markdown, single lines per point):
+
+• This move [single line context about the news]
+
+---
+
+Matrixdock Partnership Angles
+
+Angle 1 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 2 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 3 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+
+---
+
+Opportunity Score
+
 This news is a X/10 opportunity for [most relevant product].
-Reason 1
-Reason 2
-Reason 3
-I suggest you reach out to
-Name
-Title
-LinkedIn / email
+TVL Potential: [Low/Medium/High] ([one line reason]).
+Direct Fit: [Low/Medium/High] for [product] ([one line reason]).
+Strategic Lift: [Low/Medium/High] ([one line reason]).
+
+---
+
+Suggested Outreach
+
+For [Company/Initiative]:
+Name: [Full Name]
+Title: [Job Title]
+LinkedIn: [profile URL without markdown]
+Focus: [Single line describing the outreach angle]
+
+FORMATTING RULES:
+- NO markdown formatting (no **, no ### headers, no []() links)
+- Each point must be a SINGLE line
+- Use --- to separate sections
+- For angles, label each as (STBT Distribution), (Advisory & Infra), or (XAUm Reserve)
+- Keep all descriptions concise and on one line
 
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
@@ -1796,7 +1861,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-If unknown contact, say "No contact found." (One-person only)
+If unknown contact, say "No contact found."
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {fake_news}"""
@@ -1836,19 +1901,50 @@ async def handle_channel_bd_command(update: Update, context: ContextTypes.DEFAUL
 2. STBT – tokenized T-bills
 3. Advisory & infra – tokenization advisory or technical integration services
 
-Format your output as follows:
-Matrixdock can partner on these three angles
-Angle 1:
-Angle 2:
-Angle 3:
+Format your output EXACTLY as follows (no markdown, single lines per point):
+
+• This move [single line context about the news]
+
+---
+
+Matrixdock Partnership Angles
+
+Angle 1 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 2 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+[Additional point if needed]: [Single line description]
+
+Angle 3 (STBT/XAUm/Advisory)
+[Title]: [Single line description of the opportunity]
+
+---
+
+Opportunity Score
+
 This news is a X/10 opportunity for [most relevant product].
-Reason 1
-Reason 2
-Reason 3
-I suggest you reach out to
-Name
-Title
-LinkedIn / email
+TVL Potential: [Low/Medium/High] ([one line reason]).
+Direct Fit: [Low/Medium/High] for [product] ([one line reason]).
+Strategic Lift: [Low/Medium/High] ([one line reason]).
+
+---
+
+Suggested Outreach
+
+For [Company/Initiative]:
+Name: [Full Name]
+Title: [Job Title]
+LinkedIn: [profile URL without markdown]
+Focus: [Single line describing the outreach angle]
+
+FORMATTING RULES:
+- NO markdown formatting (no **, no ### headers, no []() links)
+- Each point must be a SINGLE line
+- Use --- to separate sections
+- For angles, label each as (STBT Distribution), (Advisory & Infra), or (XAUm Reserve)
+- Keep all descriptions concise and on one line
 
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
 
@@ -1885,7 +1981,7 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
-If unknown contact, say "No contact found." (One-person only)
+If unknown contact, say "No contact found."
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
 News: {replied_text}"""
