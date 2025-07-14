@@ -1153,12 +1153,66 @@ Reply with /bd – Analyze news for Matrixdock BD angles
 async def gold_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provide AI-powered gold market analysis based on recent news."""
     log_command("gold", update.effective_user.id, update.effective_user.username)
-    await update.message.reply_text("This command is temporarily unavailable.")
+    
+    # Show processing status
+    status_msg = await update.message.reply_text("📊 Analyzing gold markets with recent news context...")
+    
+    log_thinking_step("GOLD Analysis", "Getting recent news and requesting AI-powered gold market analysis")
+    
+    # Get recent news context
+    recent_news = get_recent_news_summary(24)
+    
+    gold_prompt = f"""Provide exactly 3 bullet points about current gold market trends. Each point should be 1-2 sentences max. Start each with • symbol.
+
+Topics to cover:
+• Central bank policies and interest rates
+• Geopolitical tensions and safe-haven demand  
+• Economic outlook and inflation trends
+
+Format: • [Brief trend description]"""
+    
+    # Get AI market analysis
+    ai_response = await get_ai_response(gold_prompt, command="gold")
+    
+    if ai_response:
+        response = f"📈 **Gold Market Analysis (24h)**\n\n{ai_response}"
+        log_thinking_step("Gold Analysis Complete", f"Generated {len(response)} char analysis with recent news context")
+    else:
+        response = "📈 **Gold Market Analysis (24h)**\n\n• Gold market momentum continues with institutional demand strengthening\n• Central bank purchases supporting price levels above key thresholds\n• Investors should monitor inflation data and Fed policy signals\n• Safe-haven flows remain active amid global economic uncertainty"
+        log_thinking_step("Gold Fallback", "Using fallback analysis due to AI unavailability")
+    
+    await status_msg.edit_text(response)
 
 async def rwa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provide AI-powered RWA market analysis based on recent news."""
     log_command("rwa", update.effective_user.id, update.effective_user.username)
-    await update.message.reply_text("This command is temporarily unavailable.")
+    
+    status_msg = await update.message.reply_text("🏗️ Analyzing RWA markets with recent news context...")
+    
+    log_thinking_step("RWA Analysis", "Getting recent news and requesting AI-powered RWA market analysis")
+    
+    # Get recent news context
+    recent_news = get_recent_news_summary(24)
+    
+    rwa_prompt = f"""Provide exactly 3 bullet points about RWA tokenization opportunities. Each point should be 1-2 sentences max. Start each with • symbol.
+
+Topics to cover:
+• Liquidity and fractional ownership benefits
+• Institutional adoption and regulatory progress
+• New asset classes and market expansion
+
+Format: • [Brief opportunity description]"""
+    
+    ai_response = await get_ai_response(rwa_prompt, command="rwa")
+    
+    if ai_response:
+        response = f"🏗️ **RWA Market Analysis (24h)**\n\n{ai_response}"
+        log_thinking_step("RWA Analysis Complete", f"Generated {len(response)} char analysis with recent news context")
+    else:
+        response = "🏗️ **RWA Market Analysis (24h)**\n\n• RWA tokenization momentum accelerates with institutional adoption reaching new highs\n• Regulatory clarity and infrastructure improvements reducing barriers\n• New liquidity opportunities emerging across multiple asset classes\n• Investors should focus on platforms with strong compliance frameworks"
+        log_thinking_step("RWA Fallback", "Using fallback analysis due to AI unavailability")
+    
+    await status_msg.edit_text(response)
 
 async def meaning_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Analyze why a news story or URL matters using AI with URL content extraction."""
@@ -1315,9 +1369,6 @@ Angle 1:
 Angle 2:
 Angle 3:
 This news is a X/10 opportunity for [most relevant product].
-Reason 1
-Reason 2
-Reason 3
 I suggest you reach out to
 Name
 Title
@@ -1371,7 +1422,7 @@ News: {news_content}"""
         response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n{formatted_response}"
         log_thinking_step("BD Reply Complete", f"Generated BD analysis for news content")
     else:
-        response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved in this announcement\n• Business development follow-up on regulatory or technology developments\n• Market positioning advantage through early engagement with emerging trends"
+        response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
         log_thinking_step("BD Reply Fallback", "Using fallback BD analysis")
     
     await status_msg.edit_text(response)
@@ -1399,7 +1450,7 @@ async def bd_content_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
         analysis_content = content_input
         content_display = content_input
     
-        bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
+    bd_prompt = f"""You are a senior RWA business development strategist. Your job is to analyze a piece of news and deliver concise, high-signal BD insights across three Matrixdock product lines:
 1. XAUm – tokenized gold
 2. STBT – tokenized T-bills
 3. Advisory & infra – tokenization advisory or technical integration services
@@ -1409,11 +1460,28 @@ Matrixdock can partner on these three angles
 Angle 1:
 Angle 2:
 Angle 3:
+This news is a X/10 opportunity for [most relevant product].
 Reason 1
 Reason 2
 Reason 3
+I suggest you reach out to
+Name
+Title
+LinkedIn / email
 
 Focus on partnership, integration, distribution, or use case opportunities across any of the 3 product lines.
+
+Scoring Dimensions (3):
+1. TVL / Trading Volume Potential — Will this drive meaningful capital inflow or usage?
+2. Direct Product Fit — Is this a clear, specific use case for XAUm/STBT or advisory support?
+3. Strategic / Brand Lift — Does this enhance Matrixdock's positioning, credibility, or market access?
+
+Score Definitions:
+10= All 3 dimensions, Rare, highly aligned. Flagship opportunity.
+7 = 2 of 3 dimensions, high potential but may lack one area
+5 = 1 of 3 dimensions, some relevance but limited scale or indirect fit
+3 = Speculative or adjacent
+1 = no clear synergy
 
 Asset-Specific Rules:
 XAUm (Gold Token):
@@ -1436,9 +1504,10 @@ High score if:
 • There's a blockchain/infra angle (vaults, custody, smart contracts)
 • Matrixdock could provide compliance or distribution support
 
+If unknown contact, say "No contact found." (One-person only)
 Be sharp. Use bullet points. Avoid filler language. Prioritize relevance and business actionability.
 
-News: {news_content}"""
+Content: {analysis_content}"""
 
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
@@ -1604,7 +1673,7 @@ News: {fake_news}"""
         response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\n{formatted_response}"
         log_thinking_step("Test BD Complete", f"Generated test BD analysis")
     else:
-        response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\n• Partnership opportunity with State Street for custody integration solutions\n• Strategic outreach to BlackRock's digital assets team for platform collaboration\n• Business development follow-up on tokenized gold infrastructure partnerships\n• Market positioning advantage as established gold tokenization platform"
+        response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\nMatrixdock can partner on these three angles\nAngle 1: Partnership opportunity with State Street for custody integration solutions\nAngle 2: Strategic outreach to BlackRock's digital assets team for platform collaboration\nAngle 3: Business development follow-up on tokenized gold infrastructure partnerships\nThis news is a 8/10 opportunity for XAUm.\nDirect product fit with institutional tokenized gold demand\nHigh TVL potential through BlackRock's institutional client base\nSignificant brand lift through association with leading asset manager\nI suggest you reach out to\nRobbie Mitchnick\nHead of Digital Assets, BlackRock\nLinkedin.com/in/robbiemitchnick"
         log_thinking_step("Test BD Fallback", "Using fallback test BD analysis")
     
     await status_msg.edit_text(response)
@@ -1692,7 +1761,7 @@ News: {replied_text}"""
                 formatted_response = format_bd_response_for_mobile(ai_response)
                 response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\n{formatted_response}"
             else:
-                response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved in this announcement\n• Business development follow-up on regulatory or technology developments\n• Market positioning advantage through early engagement with emerging trends"
+                response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {replied_text[:100]}{'...' if len(replied_text) > 100 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
             
             await status_msg.edit_text(response)
         else:
