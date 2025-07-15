@@ -50,6 +50,72 @@ RSS_FEEDS = {
     "ambcrypto": "https://ambcrypto.com/feed/"
 }
 
+# Source name to base URL mapping for clickable links
+SOURCE_URLS = {
+    "coindesk": "https://www.coindesk.com",
+    "cointelegraph": "https://cointelegraph.com",
+    "reuters": "https://www.reuters.com",
+    "reuters_business": "https://www.reuters.com/business",
+    "yahoo_finance": "https://finance.yahoo.com",
+    "decrypt": "https://decrypt.co",
+    "theblock": "https://www.theblock.co",
+    "benzinga": "https://www.benzinga.com",
+    "marketwatch": "https://www.marketwatch.com",
+    "cryptoslate": "https://cryptoslate.com",
+    "fintech_news": "https://www.fintechnews.org",
+    "coinjournal": "https://coinjournal.net",
+    "investing_crypto": "https://www.investing.com",
+    "crypto_news": "https://cryptonews.com",
+    "ambcrypto": "https://ambcrypto.com"
+}
+
+def get_source_url(source_name: str) -> str:
+    """Get the base URL for a source name to create clickable links."""
+    # Normalize source name (lowercase, remove spaces)
+    normalized_source = source_name.lower().replace(" ", "_")
+    
+    # Try exact match first
+    if normalized_source in SOURCE_URLS:
+        return SOURCE_URLS[normalized_source]
+    
+    # Try partial matches
+    for key, url in SOURCE_URLS.items():
+        if key in normalized_source or normalized_source in key:
+            return url
+    
+    # Fallback: try to construct URL from common patterns
+    if "reuters" in normalized_source:
+        return "https://www.reuters.com"
+    elif "yahoo" in normalized_source:
+        return "https://finance.yahoo.com"
+    elif "coindesk" in normalized_source:
+        return "https://www.coindesk.com"
+    elif "cointelegraph" in normalized_source:
+        return "https://cointelegraph.com"
+    elif "decrypt" in normalized_source:
+        return "https://decrypt.co"
+    elif "theblock" in normalized_source:
+        return "https://www.theblock.co"
+    elif "benzinga" in normalized_source:
+        return "https://www.benzinga.com"
+    elif "marketwatch" in normalized_source:
+        return "https://www.marketwatch.com"
+    elif "cryptoslate" in normalized_source:
+        return "https://cryptoslate.com"
+    elif "fintech" in normalized_source:
+        return "https://www.fintechnews.org"
+    elif "coinjournal" in normalized_source:
+        return "https://coinjournal.net"
+    elif "investing" in normalized_source:
+        return "https://www.investing.com"
+    elif "crypto" in normalized_source:
+        return "https://cryptonews.com"
+    elif "ambcrypto" in normalized_source:
+        return "https://ambcrypto.com"
+    
+    # If no match found, return a generic news search URL
+    return f"https://www.google.com/search?q={source_name}+news"
+
 # Keywords for relevance filtering - Enhanced
 RELEVANCE_KEYWORDS = {
     "rwa": [
@@ -505,9 +571,13 @@ def format_article_for_ai(article: NewsArticle) -> str:
     """Format article for AI processing."""
     content_preview = article.content[:800] + "..." if len(article.content) > 800 else article.content
     
+    # Create clickable source link
+    source_url = get_source_url(article.source)
+    source_link = f"[{article.source}]({source_url})"
+    
     return f"""
 Title: {article.title}
-Source: {article.source}
+Source: {source_link}
 Category: {article.category}
 URL: {article.url}
 Published: {article.published.strftime('%Y-%m-%d %H:%M')}
@@ -553,7 +623,8 @@ if __name__ == "__main__":
         for i, article in enumerate(articles, 1):
             print(f"\n📰 Article {i}:")
             print(f"Title: {article.title}")
-            print(f"Source: {article.source}")
+            source_url = get_source_url(article.source)
+            print(f"Source: {article.source} ({source_url})")
             print(f"Category: {article.category}")
             print(f"Relevance: {article.relevance_score:.1f}")
             print(f"URL: {article.url}")

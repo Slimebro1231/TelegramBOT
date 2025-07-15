@@ -30,7 +30,7 @@ import signal
 import sys
 import time
 import random
-from news_scraper import get_single_relevant_article, format_article_for_ai, NewsArticle, get_tracker_stats, NewsScraper
+from news_scraper import get_single_relevant_article, format_article_for_ai, NewsArticle, get_tracker_stats, NewsScraper, get_source_url
 from conflict_resolution import nuclear_conflict_resolution, ultra_robust_polling_start, should_use_conflict_resolution, should_use_ultra_robust_polling
 from bitdeer_ai_client import BitdeerAIClient
 import html
@@ -1068,9 +1068,11 @@ Provide 3 direct market impact bullets:"""
             
             # Step 4: Format final message with EST timestamp
             if article and article.source:
-                source_text = f"Source: {article.source}"
+                # Create clickable source link
+                source_url = get_source_url(article.source)
+                source_text = f"Source: [{article.source}]({source_url})"
                 if article.url:
-                    source_text += f" ({article.url})"
+                    source_text += f" ([article]({article.url}))"
                 
                 # Add published timestamp in EST
                 if article.published:
@@ -1181,6 +1183,7 @@ async def post_to_channel():
             await application_instance.bot.send_message(
                 chat_id=CHANNEL_ID,
                 text=message,
+                parse_mode='Markdown',
                 disable_web_page_preview=True
             )
             final_timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1770,7 +1773,7 @@ async def test_bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 BlackRock announced today the launch of a new tokenized gold fund, partnering with State Street for institutional custody services. The fund will allow fractional ownership of physical gold through blockchain technology, targeting institutional investors seeking digital asset exposure while maintaining traditional asset backing.
 
-Source: Reuters (https://reuters.com/example)
+Source: [Reuters](https://www.reuters.com) ([article](https://reuters.com/example))
 Published: January 15, 2025 at 02:30 PM EST"""
     
     status_msg = await update.message.reply_text("🧪 Testing BD analysis with sample news...")
