@@ -33,6 +33,7 @@ import random
 from news_scraper import get_single_relevant_article, format_article_for_ai, NewsArticle, get_tracker_stats, NewsScraper, get_source_url
 from conflict_resolution import nuclear_conflict_resolution, ultra_robust_polling_start, should_use_conflict_resolution, should_use_ultra_robust_polling
 from bitdeer_ai_client import BitdeerAIClient
+from web_search_utils import search_for_contact_info, extract_company_from_news, validate_linkedin_profile
 import html
 
 # --- Config ------------------------------------------------------------------
@@ -44,6 +45,9 @@ if TOKEN is None:
 MAX_MESSAGE_LENGTH = 4000  # Telegram limit is 4096, leave some buffer
 CHANNEL_ID = "@Matrixdock_News"  # Channel to post automatic news
 NEWS_INTERVAL = 1800  # 30 minutes between posts (in seconds)
+
+# Admin users who can trigger news posts
+ADMIN_USERS = ["mrjoshwu", "maxhanzhi"]  # Telegram usernames (without @)
 
 # --- AI Configuration --------------------------------------------------------
 # API-only mode - always use Bitdeer cloud
@@ -1068,11 +1072,10 @@ Provide 3 direct market impact bullets:"""
             
             # Step 4: Format final message with EST timestamp
             if article and article.source:
-                # Create clickable source link
-                source_url = get_source_url(article.source)
-                source_text = f"Source: [{article.source}]({source_url})"
+                # Show source name without hyperlink, then Link Here with hyperlink
+                source_text = f"Source: {article.source}"
                 if article.url:
-                    source_text += f" ([article]({article.url}))"
+                    source_text += f" - [Link Here]({article.url})"
                 
                 # Add published timestamp in EST
                 if article.published:
@@ -1081,7 +1084,7 @@ Provide 3 direct market impact bullets:"""
                         time_str = est_time.strftime('%B %d, %Y at %I:%M %p EST')
                         source_text += f"\nPublished: {time_str}"
             else:
-                source_text = f"Source: {source}"
+                source_text = ""
             
             message = f"""{headline}
 
@@ -1398,6 +1401,50 @@ News: {news_text}"""
     print(f"✅ Meaning analysis completed - Response: {len(response)} chars")
     await status_msg.edit_text(response)
 
+async def enhance_bd_response_with_linkedin(bd_response: str, news_content: str = "") -> str:
+    """
+    Replace outreach sections with "Under development" message.
+    LinkedIn functionality disabled for further development.
+    """
+    try:
+        # Replace any suggested outreach section with "Under development"
+        if "Suggested Outreach" in bd_response:
+            # Find the start of the Suggested Outreach section
+            lines = bd_response.split('\n')
+            enhanced_lines = []
+            in_outreach_section = False
+            
+            for line in lines:
+                if line.strip() == "Suggested Outreach":
+                    enhanced_lines.append(line)
+                    enhanced_lines.append("")
+                    enhanced_lines.append("Under development")
+                    in_outreach_section = True
+                elif in_outreach_section and line.strip().startswith("---"):
+                    # End of outreach section, start including lines again
+                    enhanced_lines.append("")
+                    enhanced_lines.append(line)
+                    in_outreach_section = False
+                elif in_outreach_section:
+                    # Skip lines in the outreach section
+                    continue
+                else:
+                    enhanced_lines.append(line)
+            
+            bd_response = '\n'.join(enhanced_lines)
+        
+        # Also replace fallback contact messages
+        bd_response = bd_response.replace("No contact found.", "Under development")
+        bd_response = bd_response.replace("No specific contact available - use general market research.", "Under development")
+        bd_response = bd_response.replace("I suggest you reach out to\nNo contact found.", "Suggested Outreach\n\nUnder development")
+        bd_response = bd_response.replace("I suggest you reach out to\nNo specific contact available - use general market research.", "Suggested Outreach\n\nUnder development")
+        
+        return bd_response
+        
+    except Exception as e:
+        print(f"Error processing BD response: {e}")
+        return bd_response
+
 async def bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provide AI-powered partnership and business development analysis with Matrixdock focus."""
     log_command("bd", update.effective_user.id, update.effective_user.username)
@@ -1437,10 +1484,15 @@ async def bd_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
     
     if ai_response:
-        response = f"🤝 **Matrixdock Partnership Analysis**\n\n{ai_response}"
+        # Enhance with LinkedIn search (no specific news content for general analysis)
+        enhanced_response = await enhance_bd_response_with_linkedin(ai_response, "")
+        response = f"🤝 **Matrixdock Partnership Analysis**\n\n{enhanced_response}"
         log_thinking_step("BD Analysis Complete", f"Generated {len(response)} char analysis")
     else:
-        response = "🤝 **Matrixdock Partnership Analysis**\n\nMatrixdock can partner on these three angles\nAngle 1: TradFi institutions seeking RWA tokenization solutions create strategic partnership opportunities\nAngle 2: Cross-border payment networks offer distribution channel expansion possibilities\nAngle 3: Custody and compliance providers enable institutional market access\nThis is a general 6/10 opportunity for Advisory & infra.\nBroad market opportunity with multiple potential integration points\nStrong alignment with Matrixdock's core competencies in RWA tokenization\nRequires specific opportunity identification and targeted outreach\nI suggest you reach out to\nNo specific contact available - use general market research."
+        fallback_response = "Matrixdock can partner on these three angles\nAngle 1: TradFi institutions seeking RWA tokenization solutions create strategic partnership opportunities\nAngle 2: Cross-border payment networks offer distribution channel expansion possibilities\nAngle 3: Custody and compliance providers enable institutional market access\nThis is a general 6/10 opportunity for Advisory & infra.\nBroad market opportunity with multiple potential integration points\nStrong alignment with Matrixdock's core competencies in RWA tokenization\nRequires specific opportunity identification and targeted outreach\nI suggest you reach out to\nNo specific contact available - use general market research."
+        # Enhance fallback with LinkedIn search too
+        enhanced_fallback = await enhance_bd_response_with_linkedin(fallback_response, "")
+        response = f"🤝 **Matrixdock Partnership Analysis**\n\n{enhanced_fallback}"
         log_thinking_step("BD Fallback", "Using fallback analysis due to AI unavailability")
     
     await status_msg.edit_text(response)
@@ -1559,12 +1611,17 @@ News: {news_content}"""
     ai_response = await get_ai_response(bd_prompt, command="bd_reply")
     
     if ai_response:
+        # Enhance with LinkedIn search
+        enhanced_response = await enhance_bd_response_with_linkedin(ai_response, news_content)
         # Format for mobile readability
-        formatted_response = format_bd_response_for_mobile(ai_response)
+        formatted_response = format_bd_response_for_mobile(enhanced_response)
         response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n{formatted_response}"
         log_thinking_step("BD Reply Complete", f"Generated BD analysis for news content")
     else:
-        response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\nMatrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
+        fallback_response = f"Matrixdock can partner on these three angles\nAngle 1: Strategic outreach to key stakeholders involved in this announcement\nAngle 2: Business development follow-up on regulatory or technology developments\nAngle 3: Market positioning advantage through early engagement with emerging trends\nThis news is a 5/10 opportunity for Advisory & infra.\nMedium relevance with potential for technical integration\nEstablished market presence could benefit from Matrixdock's expertise\nOpportunity exists but requires further analysis of specific details\nI suggest you reach out to\nNo contact found."
+        # Enhance fallback with LinkedIn search too
+        enhanced_fallback = await enhance_bd_response_with_linkedin(fallback_response, news_content)
+        response = f"🤝 Matrixdock BD Opportunities\n\n📰 Analyzing: {news_content[:100]}{'...' if len(news_content) > 100 else ''}\n\n{enhanced_fallback}"
         log_thinking_step("BD Reply Fallback", "Using fallback BD analysis")
     
     await status_msg.edit_text(response)
@@ -1685,12 +1742,17 @@ News: {analysis_content}"""
     ai_response = await get_ai_response(bd_prompt, command="bd_content")
     
     if ai_response:
+        # Enhance with LinkedIn search
+        enhanced_response = await enhance_bd_response_with_linkedin(ai_response, analysis_content)
         # Format for mobile readability
-        formatted_response = format_bd_response_for_mobile(ai_response)
+        formatted_response = format_bd_response_for_mobile(enhanced_response)
         response = f"🤝 Matrixdock BD Opportunities\n\n📄 Analyzing: {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\n{formatted_response}"
         log_thinking_step("BD Content Complete", f"Generated BD analysis for provided content")
     else:
-        response = f"🤝 Matrixdock BD Opportunities\n\n📄 Analyzing: {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\n• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved\n• Business development follow-up on emerging opportunities\n• Market positioning advantage through early engagement"
+        fallback_response = "• Partnership opportunity with entities mentioned in this development\n• Strategic outreach to key stakeholders involved\n• Business development follow-up on emerging opportunities\n• Market positioning advantage through early engagement"
+        # Enhance fallback with LinkedIn search too
+        enhanced_fallback = await enhance_bd_response_with_linkedin(fallback_response, analysis_content)
+        response = f"🤝 Matrixdock BD Opportunities\n\n📄 Analyzing: {content_display[:150]}{'...' if len(content_display) > 150 else ''}\n\n{enhanced_fallback}"
         log_thinking_step("BD Content Fallback", "Using fallback BD analysis")
     
     await status_msg.edit_text(response)
@@ -1877,10 +1939,44 @@ News: {fake_news}"""
         response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\n{formatted_response}"
         log_thinking_step("Test BD Complete", f"Generated test BD analysis")
     else:
-        response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\nMatrixdock can partner on these three angles\nAngle 1: Partnership opportunity with State Street for custody integration solutions\nAngle 2: Strategic outreach to BlackRock's digital assets team for platform collaboration\nAngle 3: Business development follow-up on tokenized gold infrastructure partnerships\nThis news is a 8/10 opportunity for XAUm.\nDirect product fit with institutional tokenized gold demand\nHigh TVL potential through BlackRock's institutional client base\nSignificant brand lift through association with leading asset manager\nI suggest you reach out to\nRobbie Mitchnick\nHead of Digital Assets, BlackRock\nLinkedin.com/in/robbiemitchnick"
+        response = f"🧪 Test BD Analysis\n\n📰 Sample News: BlackRock launches tokenized gold fund...\n\nMatrixdock can partner on these three angles\nAngle 1: Partnership opportunity with State Street for custody integration solutions\nAngle 2: Strategic outreach to BlackRock's digital assets team for platform collaboration\nAngle 3: Business development follow-up on tokenized gold infrastructure partnerships\nThis news is a 8/10 opportunity for XAUm.\nDirect product fit with institutional tokenized gold demand\nHigh TVL potential through BlackRock's institutional client base\nSignificant brand lift through association with leading asset manager\n\nSuggested Outreach\n\nUnder development"
         log_thinking_step("Test BD Fallback", "Using fallback test BD analysis")
     
     await status_msg.edit_text(response)
+
+async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command to trigger next news post manually."""
+    user = update.effective_user
+    username = user.username
+    
+    # Check if user is admin
+    if not username or username not in ADMIN_USERS:
+        log_command("next", user.id, username)
+        await update.message.reply_text("❌ Access denied. This command is restricted to admin users.")
+        print(f"🚫 Non-admin user {username or user.id} attempted to use /next command")
+        return
+    
+    log_command("next", user.id, username)
+    print(f"⚡ Admin user @{username} triggered manual news post")
+    
+    # Create signal file for news posting (same as virtual terminal)
+    try:
+        signal_command = {
+            'command': 'post_news',
+            'timestamp': datetime.now().strftime('%H:%M:%S'),
+            'source': f'admin_user_{username}'
+        }
+        
+        signal_file = "bot_signal.json"
+        with open(signal_file, 'w') as f:
+            json.dump(signal_command, f)
+        
+        await update.message.reply_text(f"⚡ News trigger activated by @{username}\n\n📰 Processing next news post...")
+        print(f"📤 Signal file created for manual news trigger by @{username}")
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error triggering news post: {str(e)}")
+        print(f"❌ Error creating signal file for @{username}: {e}")
 
 # handle_message function removed - bot now only responds to commands (/)
 
@@ -2021,16 +2117,17 @@ def main() -> None:
     application = Application.builder().token(TOKEN).build()
     application_instance = application  # Store global reference
 
-    # Register handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("gold", gold_command))
-    application.add_handler(CommandHandler("rwa", rwa_command))
-    application.add_handler(CommandHandler("meaning", meaning_command))
+    # Register handlers - /bd for everyone, /next for admins only
     application.add_handler(CommandHandler("bd", bd_command))
-    application.add_handler(CommandHandler("summary", summary_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("test_bd", test_bd_command))
+    application.add_handler(CommandHandler("next", next_command))
+    
+    # Handler for all other invalid commands
+    async def invalid_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle all invalid commands."""
+        await update.message.reply_text("❌ Invalid command. Available: /bd (everyone), /next (admin only)")
+    
+    # Add handler for any other command (excluding /bd and /next)
+    application.add_handler(MessageHandler(filters.COMMAND & ~filters.Regex(r'^/(bd|next)'), invalid_command))
     
     # Commands only - no text message handler (users must use /commands)
     

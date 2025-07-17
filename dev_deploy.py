@@ -58,6 +58,7 @@ class DevDeploy:
             "bitdeer_ai_client.py", 
             "news_scraper.py",
             "conflict_resolution.py",
+            "web_search_utils.py",
             "requirements.txt",
             SSH_KEY
         ]
@@ -150,6 +151,7 @@ class DevDeploy:
             "bitdeer_ai_client.py",
             "news_scraper.py", 
             "conflict_resolution.py",
+            "web_search_utils.py",
             "requirements.txt",
             "relevance_checklist.json",
             "news_tracker.json"
