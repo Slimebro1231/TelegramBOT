@@ -44,7 +44,7 @@ if TOKEN is None:
 
 MAX_MESSAGE_LENGTH = 4000  # Telegram limit is 4096, leave some buffer
 CHANNEL_ID = "@Matrixdock_News"  # Channel to post automatic news
-NEWS_INTERVAL = 1800  # 30 minutes between posts (in seconds)
+NEWS_INTERVAL = 900  # 30 minutes between posts (in seconds)
 
 # Admin users who can trigger news posts
 ADMIN_USERS = ["mrjoshwu", "maxhanzhi"]  # Telegram usernames (without @)
